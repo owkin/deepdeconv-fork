@@ -75,7 +75,7 @@ Create an ipykernel so you can use your environment with a Jupyter notebook
 
 
 ```
-python -m ipykernel install --user --name=deepdeconv
+`python -m ipykernel install --user --name=deepdeconv`
 ```
 
 Create a branch for local development

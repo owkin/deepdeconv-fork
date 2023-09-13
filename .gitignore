@@ -124,3 +124,9 @@ ENV/
 poetry.lock
 .mypy_cache/
 .ruff_cache/
+
+
+# Custom owkin
+*.pt
+*.h5ad
+notebooks/ulysse_explo.ipynb
