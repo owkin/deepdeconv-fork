@@ -23,7 +23,7 @@ from sanity_checks_utils import (
 # import data
 adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
 signature_laughney = pd.read_csv(
-    "/home/owkin/data/laughney_signature.csv", index_col=0
+    "/home/owkin/project/laughney_signature.csv", index_col=0
 ).drop(["Endothelial", "Malignant", "Stroma", "Epithelial"], axis=1)
 signature_almudena = read_almudena_signature(
     "/home/owkin/project/Almudena/Output/Crosstiss_Immune_norm/CTI.txt"
