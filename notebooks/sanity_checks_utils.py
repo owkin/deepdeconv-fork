@@ -86,6 +86,23 @@ GROUPS = {
             "Intermediate macrophages",
             "Intestinal macrophages", "ILC3"],
     },
+    "updated_granular_groups": {
+        "B": ["ABCs", "GC_B (I)", "GC_B (II)", "Memory B cells", "Naive B cells",
+            "Pre-B", "Pro-B"],
+        "Plasma": ["Plasma cells", "Plasmablasts"],
+        "Mono": ["Classical monocytes", "Nonclassical monocytes"],
+        "CD8 T": ["Tem/emra_CD8", "Tnaive/CM_CD8", "Trm/em_CD8", "Trm_gut_CD8"],
+        "CD4 T":["Teffector/EM_CD4", "Tfh", "Tnaive/CM_CD4", "Tnaive/CM_CD4_activated", "Trm_Th1/Th17"],
+        "Tregs":["Tregs"],
+        "NK": ["NK_CD16+", "NK_CD56bright_CD16-"],
+        "DC": ["DC1", "DC2", "migDC", "pDC"],
+        "Mast": ["Mast cells"],
+        "To remove": ["Cycling", "T/B doublets", "Cycling T&NK", "MNP/B doublets", 
+                      "MNP/T doublets", "Alveolar macrophages",
+                      "Erythrophagocytic macrophages", "Intermediate macrophages", 
+                      "Intestinal macrophages", "ILC3", "MAIT","T_CD4/CD8","Tgd_CRTAM+",
+                      "Trm_Tgd", "Erythroid", "Megakaryocytes", "Progenitor"],
+    }
 }
 
 
