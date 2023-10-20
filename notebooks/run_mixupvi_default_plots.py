@@ -33,7 +33,7 @@ scvi.model.MixUpVI.setup_anndata(
 )
 model = scvi.model.MixUpVI(adata, signature_type="post_encoded")
 model.view_anndata_setup()
-model.train(max_epochs=100, batch_size=512, validation_size=0.1)
+model.train(max_epochs=100, batch_size=512, validation_size=0.1,early_stopping=True)
 
 print("ok")
 

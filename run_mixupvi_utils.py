@@ -15,7 +15,7 @@ def run_categorical_value_checks(
     signature_type,
     loss_computation,
     pseudo_bulk,
-    pseudobulk_loss,
+    mixup_penalty,
     dispersion,
     gene_likelihood,
 ):
@@ -37,7 +37,7 @@ def run_categorical_value_checks(
         loss_computation, str
     ), "LOSS_COMPUTATION should be of type string"
     assert isinstance(pseudo_bulk, str), "PSEUDO_BULK should be of type string"
-    assert isinstance(pseudobulk_loss, str), "PSEUDOBULK_LOSS should be of type string"
+    assert isinstance(mixup_penalty, str), "MIXUP_PENALTY should be of type string"
     assert isinstance(dispersion, str), "DISPERSION should be of type string"
     assert isinstance(gene_likelihood, str), "GENE_LIKELIHOOD should be of type string"
     if cell_group not in [
@@ -60,9 +60,9 @@ def run_categorical_value_checks(
         raise ValueError(
             "Batch normalization can only be part of ['encoder', 'decoder', 'none', 'both']."
         )
-    if signature_type not in ["pre_encoded", "latent_space"]:
+    if signature_type not in ["pre_encoded", "post_encoded"]:
         raise ValueError(
-            "Signature type can only be part of ['pre_encoded', 'latent_space']."
+            "Signature type can only be part of ['pre_encoded', 'post_encoded']."
         )
     if loss_computation not in ["latent_space", "reconstructed_space", "both"]:
         raise ValueError(
@@ -72,8 +72,8 @@ def run_categorical_value_checks(
         raise ValueError(
             "Pseudo bulk computation can only be part of ['pre_encoded', 'latent_space']."
         )
-    if pseudobulk_loss not in ["l2", "kl"]:
-        raise ValueError("Pseudobulk loss can only be part of ['l2', 'kl'].")
+    if mixup_penalty not in ["l2", "kl"]:
+        raise ValueError("Mixup penalty can only be part of ['l2', 'kl'].")
     if dispersion not in ["gene", "gene_cell"]:
         raise ValueError(
             "The dispersion parameter can only be part of ['gene', 'gene_cell'], "
@@ -87,7 +87,7 @@ def run_categorical_value_checks(
 
 
 def run_incompatible_value_checks(
-    pseudo_bulk, loss_computation, use_batch_norm, pseudobulk_loss, gene_likelihood
+    pseudo_bulk, loss_computation, use_batch_norm, mixup_penalty, gene_likelihood
 ):
     """Check the values of the categorical variables to run MixUpVI are compatible.
     The first 4 checks will only be relevant when pseudobulk will not be computed both
@@ -123,7 +123,7 @@ def run_incompatible_value_checks(
             "MixUpVI cannot use batch normalization there, as the batch size of pseudobulk is 1."
         )
     if (
-        pseudobulk_loss == "kl"
+        mixup_penalty == "kl"
         and loss_computation != "latent_space"
         and gene_likelihood == "zinb"
     ):

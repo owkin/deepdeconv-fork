@@ -21,12 +21,13 @@ CAT_COV = [CELL_GROUP]  # for now, only works with cell groups as categorical co
 CONT_COV = None  # list of continuous covariates to include
 ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar
 ENCODE_CONT_COVARIATES = False  # True or False, whether to include cont covar
-SIGNATURE_TYPE = "pre_encoded"  # ["pre_encoded", "latent_space"]
+SIGNATURE_TYPE = "pre_encoded"  # ["pre_encoded", "post_decoded"]
 USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space", "both"]
 PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "latent_space"]
-PSEUDOBULK_LOSS = "l2"  # ["l2", "kl"]
+MIXUP_PENALTY = "l2"  # ["l2", "kl"]
 DISPERSION = "gene"  # ["gene", "gene_cell"]
+GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
 
 
 ## Run sanity checks
@@ -40,14 +41,16 @@ run_categorical_value_checks(
     signature_type=SIGNATURE_TYPE,
     loss_computation=LOSS_COMPUTATION,
     pseudo_bulk=PSEUDO_BULK,
-    pseudobulk_loss=PSEUDOBULK_LOSS,
+    mixup_penalty=MIXUP_PENALTY,
     dispersion=DISPERSION,
+    gene_likelihood=GENE_LIKELIHOOD,
 )
 run_incompatible_value_checks(
     pseudo_bulk=PSEUDO_BULK,
     loss_computation=LOSS_COMPUTATION,
     use_batch_norm=USE_BATCH_NORM,
-    pseudobulk_loss=PSEUDOBULK_LOSS,
+    mixup_penalty=MIXUP_PENALTY,
+    gene_likelihood=GENE_LIKELIHOOD,
 )
 
 
@@ -109,7 +112,9 @@ model = MixUpVI(
     pseudo_bulk=PSEUDO_BULK,
     encode_covariates=ENCODE_COVARIATES,  # always False for now, because cat covariates is only cell types
     encode_cont_covariates=ENCODE_CONT_COVARIATES,  # if want to encode continuous covariates
-    pseudobulk_loss=PSEUDOBULK_LOSS,
+    mixup_penalty=MIXUP_PENALTY,
+    dispersion=DISPERSION,
+    gene_likelihood=GENE_LIKELIHOOD,
 )
 model.train(max_epochs=100)
 

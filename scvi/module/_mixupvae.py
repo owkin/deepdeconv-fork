@@ -75,7 +75,7 @@ class MixUpVAE(VAE):
         One of
 
         * ``'pre_encoded'`` - Compute the signature matrix in the input space.
-        * ``'latent_space'`` - Compute the signature matrix inside the latent space.
+        * ``'post_encoded'`` - Compute the signature matrix inside the latent space.
     loss_computation
         One of
 
@@ -92,7 +92,7 @@ class MixUpVAE(VAE):
          where we differentiate for now between caterigocal and continuous covariates.
     encode_cont_covariates
         Whether to concatenate continuous covariates to expression in encoder
-    pseudobulk_loss
+    mixup_penalty
         The loss to use to compare the average of encoded cell and the encoded pseudobulk.
     deeply_inject_covariates
         Whether to concatenate covariates into output of hidden layers in encoder/decoder. This option
@@ -155,7 +155,7 @@ class MixUpVAE(VAE):
         loss_computation: str = "latent_space",
         pseudo_bulk: str = "pre_encoded",
         encode_cont_covariates: bool = False,
-        pseudobulk_loss: str = "l2",
+        mixup_penalty: str = "l2",
     ):
         super().__init__(
             n_input=n_input,
@@ -187,7 +187,7 @@ class MixUpVAE(VAE):
         self.loss_computation = loss_computation
         self.pseudo_bulk = pseudo_bulk
         self.encode_cont_covariates = encode_cont_covariates
-        self.pseudobulk_loss = pseudobulk_loss
+        self.mixup_penalty = mixup_penalty
         # decoder goes from n_latent-dimensional space to n_input-d data
         n_input_decoder = n_latent + n_continuous_cov
         use_batch_norm_decoder = use_batch_norm == "decoder" or use_batch_norm == "both"
@@ -324,7 +324,7 @@ class MixUpVAE(VAE):
                 batch_index,  # will not be used since encode_covariates==False
                 *categorical_input,  # will not be used since encode_covariates==False
             )  # for signature, batch_index and cat_covs are not the right dimension
-        elif self.signature_type == "latent_space":
+        elif self.signature_type == "post_encoded":
             # create signature matrix - inside the latent space
             z_signature = []
             for cell_type in unique_indices:
@@ -557,18 +557,18 @@ class MixUpVAE(VAE):
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        pseudo_loss = 0
+        mixup_loss = 0
         if self.loss_computation == "latent_space" or self.loss_computation == "both":
-            if self.pseudobulk_loss == "l2":
+            if self.mixup_penalty == "l2":
                 # l2 penalty in latent space
                 computed_loss, mean_z = self.get_l2_mixup_loss(
                     inference_outputs["z"], inference_outputs["z_pseudobulk"].squeeze(0)
                 )
-                pseudo_loss += computed_loss
+                mixup_loss += computed_loss
 
-            elif self.pseudobulk_loss == "kl":
+            elif self.mixup_penalty == "kl":
                 # kl of mean(encoded cells) compared to reference encoded pseudobulk
-                pseudo_loss += self.get_kl_mixup_loss(
+                mixup_loss += self.get_kl_mixup_loss(
                     inference_outputs["qz"], inference_outputs["qz_pseudobulk"]
                 )  # should it be -= instead of += ?
 
@@ -576,21 +576,21 @@ class MixUpVAE(VAE):
             self.loss_computation == "reconstructed_space"
             or self.loss_computation == "both"
         ):
-            if self.pseudobulk_loss == "l2":
+            if self.mixup_penalty == "l2":
                 # l2 penalty in reconstructed space
                 generative_x = generative_outputs["px"].rsample()
                 generative_pseudobulk = generative_outputs["px_pseudobulk"].rsample()
                 computed_loss, _ = self.get_l2_mixup_loss(
                     generative_x, generative_pseudobulk
                 )
-                pseudo_loss += computed_loss
-            elif self.pseudobulk_loss == "kl":
+                mixup_loss += computed_loss
+            elif self.mixup_penalty == "kl":
                 # kl of mean(encoded cells) compared to reference encoded pseudobulk
-                pseudo_loss += self.get_kl_mixup_loss(
+                mixup_loss += self.get_kl_mixup_loss(
                     generative_outputs["px"], generative_outputs["px_pseudobulk"]
                 )  # should it be -= instead of += ?
 
-        loss = torch.mean(reconst_loss + weighted_kl_local) + pseudo_loss
+        loss = torch.mean(reconst_loss + weighted_kl_local) + mixup_loss
 
         pearson_coeff = self.get_pearsonr_torch(
             mean_z, inference_outputs["z_pseudobulk"].squeeze(0)
@@ -614,7 +614,7 @@ class MixUpVAE(VAE):
         # logging
         reconst_losses = {
             "reconst_loss": reconst_loss,
-            "pseudobulk_loss": pseudo_loss,
+            "mixup_penalty": mixup_loss,
         }  # never used ?
 
         kl_local = {
@@ -627,7 +627,7 @@ class MixUpVAE(VAE):
             reconstruction_loss=reconst_loss,
             kl_local=kl_local,
             extra_metrics={
-                "pseudobulk_loss": pseudo_loss,
+                "mixup_penalty": mixup_loss,
                 "pearson_coeff": pearson_coeff,
                 "cosine_similarity": cosine_similarity,
                 "pearson_coeff_deconv": pearson_coeff_deconv,
@@ -637,8 +637,8 @@ class MixUpVAE(VAE):
     def get_l2_mixup_loss(self, single_cells, pseudobulk):
         """Compute L2 loss between average of single cells and pseudobulk."""
         mean_single_cells = torch.mean(single_cells, axis=0)
-        pseudobulk_loss = torch.sum((pseudobulk - mean_single_cells) ** 2)
-        return pseudobulk_loss, mean_single_cells
+        mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2)
+        return mixup_penalty, mean_single_cells
 
     def get_kl_mixup_loss(
         self, single_cells_distrib, pseudobulk_distrib, computed_space
@@ -652,12 +652,12 @@ class MixUpVAE(VAE):
                 single_cells_distrib.loc
             )
             averaged_cells_distrib = Normal(mean_averaged_cells, std_averaged_cells)
-            pseudobulk_loss = kl(averaged_cells_distrib, pseudobulk_distrib).sum(dim=-1)
+            mixup_penalty = kl(averaged_cells_distrib, pseudobulk_distrib).sum(dim=-1)
         elif computed_space == "reconstructed_space":
             if self.gene_likelihood == "poisson":
                 rate_averaged_cells = single_cells_distrib.rate.mean(axis=0)
                 averaged_cells_distrib = Poisson(rate_averaged_cells)
-                pseudobulk_loss = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
+                mixup_penalty = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
                     dim=-1
                 )
             elif self.dispersion != "gene":
@@ -669,7 +669,7 @@ class MixUpVAE(VAE):
                 # only works because dispersion is constant across cells
                 mean_averaged_cells = single_cells_distrib.mu.mean(axis=0)
                 averaged_cells_distrib = NegativeBinomial(rate_averaged_cells)
-                pseudobulk_loss = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
+                mixup_penalty = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
                     dim=-1
                 )
             elif self.gene_likelihood == "zinb":
@@ -679,7 +679,7 @@ class MixUpVAE(VAE):
                     "zero-inflated negative binomials is not computable yet."
                 )
 
-        return pseudobulk_loss
+        return mixup_penalty
 
     def get_pearsonr_torch(self, x, y):
         """
