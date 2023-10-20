@@ -17,6 +17,7 @@ def run_categorical_value_checks(
     pseudo_bulk,
     pseudobulk_loss,
     dispersion,
+    gene_likelihood,
 ):
     """Check the values and types of the categorical variables to run MixUpVI."""
     assert isinstance(cell_group, str), "CELL_GROUP should be of type string"
@@ -38,6 +39,7 @@ def run_categorical_value_checks(
     assert isinstance(pseudo_bulk, str), "PSEUDO_BULK should be of type string"
     assert isinstance(pseudobulk_loss, str), "PSEUDOBULK_LOSS should be of type string"
     assert isinstance(dispersion, str), "DISPERSION should be of type string"
+    assert isinstance(gene_likelihood, str), "GENE_LIKELIHOOD should be of type string"
     if cell_group not in [
         "primary_groups",
         "precise_groups",
@@ -78,10 +80,14 @@ def run_categorical_value_checks(
             "not gene-label nor gene-batch because categorical covariates don't make "
             "sense for pseudobulk."
         )
+    if gene_likelihood not in ["zinb", "nb", "poisson"]:
+        raise ValueError(
+            "The dispersion parameter can only be part of ['zinb', 'nb', 'poisson']."
+        )
 
 
 def run_incompatible_value_checks(
-    pseudo_bulk, loss_computation, use_batch_norm, pseudobulk_loss
+    pseudo_bulk, loss_computation, use_batch_norm, pseudobulk_loss, gene_likelihood
 ):
     """Check the values of the categorical variables to run MixUpVI are compatible.
     The first 4 checks will only be relevant when pseudobulk will not be computed both
@@ -116,63 +122,12 @@ def run_incompatible_value_checks(
         raise ValueError(
             "MixUpVI cannot use batch normalization there, as the batch size of pseudobulk is 1."
         )
-    if pseudobulk_loss == "kl" and loss_computation != "latent_space":
+    if (
+        pseudobulk_loss == "kl"
+        and loss_computation != "latent_space"
+        and gene_likelihood == "zinb"
+    ):
         raise NotImplementedError(
-            "The KL divergence between ZINB distributions for the MixUp loss is implemented."
-        )  # what are the parameters of average of independant ZINB ?
-
-
-def pearsonr_torch(x, y):
-    """
-    Mimics `scipy.stats.pearsonr`
-    Arguments
-    ---------
-    x : 1D torch.Tensor
-    y : 1D torch.Tensor
-    Returns
-    -------
-    r_val : float
-        pearsonr correlation coefficient between x and y
-
-    Scipy docs ref:
-        https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html
-
-    Scipy code ref:
-        https://github.com/scipy/scipy/blob/v0.19.0/scipy/stats/stats.py#L2975-L3033
-    Example:
-        >>> x = np.random.randn(100)
-        >>> y = np.random.randn(100)
-        >>> sp_corr = scipy.stats.pearsonr(x, y)[0]
-        >>> th_corr = pearsonr(torch.from_numpy(x), torch.from_numpy(y))
-        >>> np.allclose(sp_corr, th_corr)
-    """
-    mean_x = torch.mean(x)
-    mean_y = torch.mean(y)
-    xm = x.sub(mean_x)
-    ym = y.sub(mean_y)
-    r_num = xm.dot(ym)
-    r_den = torch.norm(xm, 2) * torch.norm(ym, 2)
-    r_val = r_num / r_den
-    return r_val
-
-
-def compute_l2_mixup_loss(single_cells, pseudobulk):
-    """
-    Compute L2 loss between average of single cells and pseudobulk
-    """
-    mean_single_cells = torch.mean(single_cells, axis=0)
-    pseudobulk_loss = torch.sum((pseudobulk - mean_single_cells) ** 2)
-    return pseudobulk_loss, mean_single_cells
-
-
-def compute_kl_mixup_loss(single_cells_distrib, pseudobulk_distrib):
-    """
-    Compute KL divergence between average of single cells distrib and pseudobulk distrib
-    """
-    mean_averaged_cells = single_cells_distrib.mean.mean(axis=0)
-    std_averaged_cells = single_cells_distrib.variance.sum(axis=0).sqrt() / len(
-        single_cells_distrib.loc
-    )
-    averaged_cells_distrib = Normal(mean_averaged_cells, std_averaged_cells)
-    pseudobulk_loss = kl(averaged_cells_distrib, pseudobulk_distrib).sum(dim=-1)
-    return pseudobulk_loss
+            "The KL divergence between ZINB distributions for the MixUp loss is not "
+            "implemented."
+        )

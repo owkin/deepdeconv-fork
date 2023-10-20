@@ -19,11 +19,6 @@ from ._vae import VAE
 # for deconvolution
 from scipy.optimize import nnls
 from scipy.stats import pearsonr
-from run_mixupvi_utils import (
-    pearsonr_torch,
-    compute_l2_mixup_loss,
-    compute_kl_mixup_loss,
-)
 
 torch.backends.cudnn.benchmark = True
 
@@ -566,14 +561,14 @@ class MixUpVAE(VAE):
         if self.loss_computation == "latent_space" or self.loss_computation == "both":
             if self.pseudobulk_loss == "l2":
                 # l2 penalty in latent space
-                computed_loss, mean_z = compute_l2_mixup_loss(
+                computed_loss, mean_z = self.get_l2_mixup_loss(
                     inference_outputs["z"], inference_outputs["z_pseudobulk"].squeeze(0)
                 )
                 pseudo_loss += computed_loss
 
             elif self.pseudobulk_loss == "kl":
                 # kl of mean(encoded cells) compared to reference encoded pseudobulk
-                pseudo_loss += compute_kl_mixup_loss(
+                pseudo_loss += self.get_kl_mixup_loss(
                     inference_outputs["qz"], inference_outputs["qz_pseudobulk"]
                 )  # should it be -= instead of += ?
 
@@ -585,22 +580,19 @@ class MixUpVAE(VAE):
                 # l2 penalty in reconstructed space
                 generative_x = generative_outputs["px"].rsample()
                 generative_pseudobulk = generative_outputs["px_pseudobulk"].rsample()
-                computed_loss, _ = compute_l2_mixup_loss(
+                computed_loss, _ = self.get_l2_mixup_loss(
                     generative_x, generative_pseudobulk
                 )
                 pseudo_loss += computed_loss
             elif self.pseudobulk_loss == "kl":
                 # kl of mean(encoded cells) compared to reference encoded pseudobulk
-                raise NotImplementedError(
-                    "The KL divergence between ZINB distributions for the MixUp loss is implemented."
-                )  # what are the parameters of average of independant ZINB ?
-                pseudo_loss += compute_kl_mixup_loss(
+                pseudo_loss += self.get_kl_mixup_loss(
                     generative_outputs["px"], generative_outputs["px_pseudobulk"]
                 )  # should it be -= instead of += ?
 
         loss = torch.mean(reconst_loss + weighted_kl_local) + pseudo_loss
 
-        pearson_coeff = pearsonr_torch(
+        pearson_coeff = self.get_pearsonr_torch(
             mean_z, inference_outputs["z_pseudobulk"].squeeze(0)
         )
         # deconvolution in latent space
@@ -641,3 +633,83 @@ class MixUpVAE(VAE):
                 "pearson_coeff_deconv": pearson_coeff_deconv,
             },
         )
+
+    def get_l2_mixup_loss(self, single_cells, pseudobulk):
+        """Compute L2 loss between average of single cells and pseudobulk."""
+        mean_single_cells = torch.mean(single_cells, axis=0)
+        pseudobulk_loss = torch.sum((pseudobulk - mean_single_cells) ** 2)
+        return pseudobulk_loss, mean_single_cells
+
+    def get_kl_mixup_loss(
+        self, single_cells_distrib, pseudobulk_distrib, computed_space
+    ):
+        """Compute KL divergence between average of single cells distrib and pseudobulk
+        distribution.
+        """
+        if computed_space == "latent_space":
+            mean_averaged_cells = single_cells_distrib.mean.mean(axis=0)
+            std_averaged_cells = single_cells_distrib.variance.sum(axis=0).sqrt() / len(
+                single_cells_distrib.loc
+            )
+            averaged_cells_distrib = Normal(mean_averaged_cells, std_averaged_cells)
+            pseudobulk_loss = kl(averaged_cells_distrib, pseudobulk_distrib).sum(dim=-1)
+        elif computed_space == "reconstructed_space":
+            if self.gene_likelihood == "poisson":
+                rate_averaged_cells = single_cells_distrib.rate.mean(axis=0)
+                averaged_cells_distrib = Poisson(rate_averaged_cells)
+                pseudobulk_loss = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
+                    dim=-1
+                )
+            elif self.dispersion != "gene":
+                raise NotImplementedError(
+                    "The parameters of the sum of independant variables following "
+                    "negative binomials with varying dispersion is not computable yet."
+                )
+            elif self.gene_likelihood == "nb":
+                # only works because dispersion is constant across cells
+                mean_averaged_cells = single_cells_distrib.mu.mean(axis=0)
+                averaged_cells_distrib = NegativeBinomial(rate_averaged_cells)
+                pseudobulk_loss = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
+                    dim=-1
+                )
+            elif self.gene_likelihood == "zinb":
+                # not yet implemented because of the zero inflation
+                raise NotImplementedError(
+                    "The parameters of the sum of independant variables following "
+                    "zero-inflated negative binomials is not computable yet."
+                )
+
+        return pseudobulk_loss
+
+    def get_pearsonr_torch(self, x, y):
+        """
+        Mimics `scipy.stats.pearsonr`
+        Arguments
+        ---------
+        x : 1D torch.Tensor
+        y : 1D torch.Tensor
+        Returns
+        -------
+        r_val : float
+            pearsonr correlation coefficient between x and y
+
+        Scipy docs ref:
+            https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html
+
+        Scipy code ref:
+            https://github.com/scipy/scipy/blob/v0.19.0/scipy/stats/stats.py#L2975-L3033
+        Example:
+            >>> x = np.random.randn(100)
+            >>> y = np.random.randn(100)
+            >>> sp_corr = scipy.stats.pearsonr(x, y)[0]
+            >>> th_corr = pearsonr(torch.from_numpy(x), torch.from_numpy(y))
+            >>> np.allclose(sp_corr, th_corr)
+        """
+        mean_x = torch.mean(x)
+        mean_y = torch.mean(y)
+        xm = x.sub(mean_x)
+        ym = y.sub(mean_y)
+        r_num = xm.dot(ym)
+        r_den = torch.norm(xm, 2) * torch.norm(ym, 2)
+        r_val = r_num / r_den
+        return r_val
