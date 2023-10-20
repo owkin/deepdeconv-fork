@@ -558,13 +558,13 @@ class MixUpVAE(VAE):
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
         mixup_loss = 0
+        mean_z = torch.mean(inference_outputs["z"], axis=0)
         if self.loss_computation == "latent_space" or self.loss_computation == "both":
             if self.mixup_penalty == "l2":
                 # l2 penalty in latent space
-                computed_loss, mean_z = self.get_l2_mixup_loss(
-                    inference_outputs["z"], inference_outputs["z_pseudobulk"].squeeze(0)
+                mixup_loss += self.get_l2_mixup_loss(
+                    mean_z, inference_outputs["z_pseudobulk"].squeeze(0)
                 )
-                mixup_loss += computed_loss
 
             elif self.mixup_penalty == "kl":
                 # kl of mean(encoded cells) compared to reference encoded pseudobulk
@@ -579,11 +579,9 @@ class MixUpVAE(VAE):
             if self.mixup_penalty == "l2":
                 # l2 penalty in reconstructed space
                 generative_x = generative_outputs["px"].rsample()
+                mean_x = torch.mean(generative_x, axis=0)
                 generative_pseudobulk = generative_outputs["px_pseudobulk"].rsample()
-                computed_loss, _ = self.get_l2_mixup_loss(
-                    generative_x, generative_pseudobulk
-                )
-                mixup_loss += computed_loss
+                mixup_loss += self.get_l2_mixup_loss(mean_x, generative_pseudobulk)
             elif self.mixup_penalty == "kl":
                 # kl of mean(encoded cells) compared to reference encoded pseudobulk
                 mixup_loss += self.get_kl_mixup_loss(
@@ -634,11 +632,10 @@ class MixUpVAE(VAE):
             },
         )
 
-    def get_l2_mixup_loss(self, single_cells, pseudobulk):
+    def get_l2_mixup_loss(self, mean_single_cells, pseudobulk):
         """Compute L2 loss between average of single cells and pseudobulk."""
-        mean_single_cells = torch.mean(single_cells, axis=0)
         mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2)
-        return mixup_penalty, mean_single_cells
+        return mixup_penalty
 
     def get_kl_mixup_loss(
         self, single_cells_distrib, pseudobulk_distrib, computed_space

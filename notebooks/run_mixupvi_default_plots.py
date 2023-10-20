@@ -31,15 +31,15 @@ scvi.model.MixUpVI.setup_anndata(
     categorical_covariate_keys=["cell_type"],  # no other cat covariate for now
     # continuous_covariate_keys=["percent_mito", "percent_ribo"],
 )
-model = scvi.model.MixUpVI(adata, signature_type="post_encoded")
+model = scvi.model.MixUpVI(
+    adata, signature_type="post_encoded", loss_computation="reconstructed_space"
+)
 model.view_anndata_setup()
-model.train(max_epochs=100, batch_size=512, validation_size=0.1,early_stopping=True)
-
-print("ok")
+model.train(max_epochs=100, batch_size=1024, train_size=0.9, check_val_every_n_epoch=1)
 
 
 # %%
-# Plot coefficients
+# Plot coefficients train
 plt.plot(
     range(100),
     model.history["pearson_coeff_train"],
@@ -56,12 +56,33 @@ plt.plot(
     label="Deconv cosine similarity",
 )
 plt.legend()
+plt.title("Train metrics")
+
+
+# %%
+# Plot coefficients val
+plt.plot(
+    range(100),
+    model.history["pearson_coeff_validation"],
+    label="Latent space Pearson coefficient",
+)
+plt.plot(
+    range(100),
+    model.history["pearson_coeff_deconv_validation"],
+    label="Deconv pearson coefficient",
+)
+plt.plot(
+    range(100),
+    model.history["cosine_similarity_validation"],
+    label="Deconv cosine similarity",
+)
+plt.legend()
+plt.title("Val metrics")
 
 
 # %%
 # Plot train loss epoch
 plt.plot(range(100), model.history["train_loss_epoch"], label="Train loss epoch")
-plt.plot(range(100), model.history["elbo_train"], label="Train elbo")
 plt.legend()
 
 # %%
