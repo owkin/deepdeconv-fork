@@ -486,13 +486,13 @@ class MixUpVAE(VAE):
             )
         elif self.gene_likelihood == "nb":
             px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
-            px_pseudobulk = NegativeBinomial(
-                mu=px_pseudobulk_rate, theta=px_pseudobulk_r, scale=px_pseudobulk_scale
-            )
         elif self.gene_likelihood == "poisson":
             px = Poisson(px_rate, scale=px_scale)
             px_pseudobulk = Poisson(px_pseudobulk_rate, scale=px_pseudobulk_scale)
-
+        # pseudobulk gene likelihood
+        px_pseudobulk = NegativeBinomial(
+            mu=px_pseudobulk_rate, theta=px_pseudobulk_r, scale=px_pseudobulk_scale
+        )
         # Priors
         if self.use_observed_lib_size:
             pl = None
@@ -578,9 +578,9 @@ class MixUpVAE(VAE):
         ):
             if self.mixup_penalty == "l2":
                 # l2 penalty in reconstructed space
-                generative_x = generative_outputs["px"].rsample()
+                generative_x = generative_outputs["px"].sample()
                 mean_x = torch.mean(generative_x, axis=0)
-                generative_pseudobulk = generative_outputs["px_pseudobulk"].rsample()
+                generative_pseudobulk = generative_outputs["px_pseudobulk"].sample()
                 mixup_loss += self.get_l2_mixup_loss(mean_x, generative_pseudobulk)
             elif self.mixup_penalty == "kl":
                 # kl of mean(encoded cells) compared to reference encoded pseudobulk
@@ -608,6 +608,11 @@ class MixUpVAE(VAE):
             / np.linalg.norm(predicted_proportions)
         )
         pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
+        # random proportions
+        random_proportions = self.create_random_proportion(
+            n_classes=len(proportions_array), n_non_zero=None
+        )
+        pearson_coeff_random = pearsonr(proportions_array, random_proportions)[0]
 
         # logging
         reconst_losses = {
@@ -629,10 +634,31 @@ class MixUpVAE(VAE):
                 "pearson_coeff": pearson_coeff,
                 "cosine_similarity": cosine_similarity,
                 "pearson_coeff_deconv": pearson_coeff_deconv,
+                "pearson_coeff_random": pearson_coeff_random,
             },
         )
 
-    def get_l2_mixup_loss(self, mean_single_cells, pseudobulk):
+    def create_random_proportion(
+        self, n_classes: int, n_non_zero: Optional[int] = None
+    ) -> np.ndarray:
+        """Create a random proportion vector of size n_classes.
+
+        The n_non_zero parameter allows to set the number
+        of non-zero components of the random discrete density vector.
+        """
+        if n_non_zero is None:
+            n_non_zero = n_classes
+
+        proportion_vector = np.zeros(
+            n_classes,
+        )
+
+        proportion_vector[:n_non_zero] = np.random.rand(n_non_zero)
+
+        proportion_vector = proportion_vector / proportion_vector.sum()
+        return np.random.permutation(proportion_vector)
+
+    def get_l2_mixup_loss(self, single_cells, pseudobulk):
         """Compute L2 loss between average of single cells and pseudobulk."""
         mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2)
         return mixup_penalty
