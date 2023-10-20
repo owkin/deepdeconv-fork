@@ -612,7 +612,8 @@ class MixUpVAE(VAE):
         pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
         # random proportions
         random_proportions = self.create_random_proportion(
-            len(proportions_array), n_non_zero=2
+            n_classes=len(proportions_array),
+            n_non_zero=None
         )
         pearson_coeff_random = pearsonr(proportions_array, random_proportions)[0]
 
@@ -641,6 +642,7 @@ class MixUpVAE(VAE):
         )
 
     def create_random_proportion(
+        self,
         n_classes: int,
         n_non_zero: Optional[int] = None
         ) -> np.ndarray:
