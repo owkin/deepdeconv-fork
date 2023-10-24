@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+from typing import Optional
 
 from scvi.nn import one_hot
 
@@ -56,3 +58,58 @@ def masked_softmax(weights, mask, dim=-1, eps=1e-30):
     masked_exps = weight_exps.masked_fill(mask == 0, eps)
     masked_sums = masked_exps.sum(dim, keepdim=True) + eps
     return masked_exps / masked_sums
+
+
+def create_random_proportion(
+    n_classes: int, n_non_zero: Optional[int] = None
+) -> np.ndarray:
+    """Create a random proportion vector of size n_classes.
+
+    The n_non_zero parameter allows to set the number
+    of non-zero components of the random discrete density vector.
+    """
+    if n_non_zero is None:
+        n_non_zero = n_classes
+
+    proportion_vector = np.zeros(
+        n_classes,
+    )
+
+    proportion_vector[:n_non_zero] = np.random.rand(n_non_zero)
+
+    proportion_vector = proportion_vector / proportion_vector.sum()
+    return np.random.permutation(proportion_vector)
+
+
+def get_pearsonr_torch(x, y):
+    """
+    Mimics `scipy.stats.pearsonr`
+    Arguments
+    ---------
+    x : 1D torch.Tensor
+    y : 1D torch.Tensor
+    Returns
+    -------
+    r_val : float
+        pearsonr correlation coefficient between x and y
+
+    Scipy docs ref:
+        https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html
+
+    Scipy code ref:
+        https://github.com/scipy/scipy/blob/v0.19.0/scipy/stats/stats.py#L2975-L3033
+    Example:
+        >>> x = np.random.randn(100)
+        >>> y = np.random.randn(100)
+        >>> sp_corr = scipy.stats.pearsonr(x, y)[0]
+        >>> th_corr = pearsonr(torch.from_numpy(x), torch.from_numpy(y))
+        >>> np.allclose(sp_corr, th_corr)
+    """
+    mean_x = torch.mean(x)
+    mean_y = torch.mean(y)
+    xm = x.sub(mean_x)
+    ym = y.sub(mean_y)
+    r_num = xm.dot(ym)
+    r_den = torch.norm(xm, 2) * torch.norm(ym, 2)
+    r_val = r_num / r_den
+    return r_val
