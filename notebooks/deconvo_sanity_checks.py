@@ -28,10 +28,12 @@ signature_laughney = pd.read_csv(
 signature_almudena = read_almudena_signature(
     "/home/owkin/project/Almudena/Output/Crosstiss_Immune_norm/CTI.txt"
 )  # it is the normalised one (using adata.X and not adata.raw.X, to match this code)
+# TO ADD : the new signature with granular updated cell types
 
 
 # %%
 # cell type categories
+# TO ADD : possibility of crosstissue_granular_updated
 signature_choice = "crosstissue_general" # choose between laughney and crosstissue_general
 grouping_choice = "primary_groups" # choose between primary_groups and precise_groups
 if signature_choice in ["laughney", "crosstissue_general"] and grouping_choice != "primary_groups":
@@ -63,6 +65,9 @@ cell_types_train, cell_types_test = train_test_split(
     random_state=42,
 )
 adata = adata[cell_types_test, :]
+# WARNING. The following line appears in the R sanity checks script:
+# scRNseq_test <- NormalizeData(object = scRNseq_test, normalization.method = "RC",scale.factor = 10000)
+# Should we thus add it here ? (on the raw counts I guess)
 
 
 # %%
@@ -82,6 +87,7 @@ if signature_choice == "laughney":
     signature.index = ensg_names
 elif signature_choice == "crosstissue_general":
     signature = signature_almudena.copy()
+# TO ADD : possibility of granular updated cross tissue signature
 
 # intersection between all genes and marker genes
 intersection = list(set(adata.var_names).intersection(signature.index))
