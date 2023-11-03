@@ -1,8 +1,6 @@
 """MixUpVI utils."""
 
-import torch
-from torch.distributions import Normal
-from torch.distributions import kl_divergence as kl
+import matplotlib.pyplot as plt
 
 
 def run_categorical_value_checks(
@@ -46,7 +44,8 @@ def run_categorical_value_checks(
         "updated_granular_groups",
     ]:
         raise NotImplementedError(
-            "For now, only these cell category granularities are implemented."
+            "For now, the following cell category granularities are implemented: "
+            "['primary_groups', 'precise_groups', 'updated_granular_groups']"
         )
     if len(cat_cov) > 1:
         raise NotImplementedError(
@@ -60,17 +59,17 @@ def run_categorical_value_checks(
         raise ValueError(
             "Batch normalization can only be part of ['encoder', 'decoder', 'none', 'both']."
         )
-    if signature_type not in ["pre_encoded", "post_encoded"]:
+    if signature_type not in ["pre_encoded", "post_inference"]:
         raise ValueError(
-            "Signature type can only be part of ['pre_encoded', 'post_encoded']."
+            "Signature type can only be part of ['pre_encoded', 'post_inference']."
         )
-    if loss_computation not in ["latent_space", "reconstructed_space", "both"]:
+    if loss_computation not in ["latent_space", "reconstructed_space"]:
         raise ValueError(
-            "Loss computation can only be part of ['latent_space', 'reconstructed_space', 'both']."
+            "Loss computation can only be part of ['latent_space', 'reconstructed_space']."
         )
-    if pseudo_bulk not in ["pre_encoded", "latent_space"]:
+    if pseudo_bulk not in ["pre_encoded", "post_inference"]:
         raise ValueError(
-            "Pseudo bulk computation can only be part of ['pre_encoded', 'latent_space']."
+            "Pseudo bulk computation can only be part of ['pre_encoded', 'post_inference']."
         )
     if mixup_penalty not in ["l2", "kl"]:
         raise ValueError("Mixup penalty can only be part of ['l2', 'kl'].")
@@ -104,18 +103,18 @@ def run_incompatible_value_checks(
         )
     elif (
         pseudo_bulk == "pre_encoded"
-        and loss_computation in ["reconstructed_space", "both"]
+        and loss_computation == "reconstructed_space"
         and use_batch_norm != "none"
     ):
         raise ValueError(
             "MixUpVI cannot use batch normalization there, as the batch size of pseudobulk is 1."
         )
-    elif pseudo_bulk == "latent_space" and loss_computation != "reconstructed_space":
+    elif pseudo_bulk == "post_inference" and loss_computation == "latent_space":
         raise ValueError(
             "Pseudo bulk needs to be pre-encoded to compute the MixUp loss in the latent space."
         )
     elif (
-        pseudo_bulk == "latent_space"
+        pseudo_bulk == "post_inference"
         and loss_computation == "reconstructed_space"
         and use_batch_norm in ["decoder", "both"]
     ):
@@ -131,3 +130,102 @@ def run_incompatible_value_checks(
             "The KL divergence between ZINB distributions for the MixUp loss is not "
             "implemented."
         )
+
+
+def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
+    """Plot the train or val metrics from training."""
+    if train:
+        suffix = "train"
+    else:
+        suffix = "validation"
+    plt.plot(
+        range(n_epochs),
+        model_history[f"pearson_coeff_{suffix}"],
+        label="Latent space Pearson coefficient",
+    )
+    plt.plot(
+        range(n_epochs),
+        model_history[f"pearson_coeff_deconv_{suffix}"],
+        label="Deconv pearson coefficient",
+    )
+    plt.plot(
+        range(n_epochs),
+        model_history[f"cosine_similarity_{suffix}"],
+        label="Deconv cosine similarity",
+    )
+    plt.legend()
+    plt.title(f"{suffix} metrics")
+    plt.show()
+
+
+def plot_loss(model_history, n_epochs: int = 100):
+    """Plot the train and val loss from training."""
+    plt.plot(range(n_epochs), model_history["train_loss_epoch"], label="Train")
+    plt.plot(
+        range(n_epochs),
+        model_history["validation_loss"],
+        label="Validation",
+    )
+    plt.legend()
+    plt.title("Loss epochs")
+    plt.show()
+
+
+def plot_mixup_loss(model_history, n_epochs: int = 100):
+    """Plot the train and val mixup loss from training."""
+    plt.plot(range(n_epochs), model_history["mixup_penalty_train"], label="Train")
+    plt.plot(
+        range(n_epochs),
+        model_history["mixup_penalty_validation"],
+        label="Validation",
+    )
+    plt.legend()
+    plt.title("Mixup loss epochs")
+    plt.show()
+
+
+def plot_reconstruction_loss(model_history, n_epochs: int = 100):
+    """Plot the train and val reconstruction loss from training."""
+    plt.plot(range(n_epochs), model_history["reconstruction_loss_train"], label="Train")
+    plt.plot(
+        range(n_epochs),
+        model_history["reconstruction_loss_validation"],
+        label="Validation",
+    )
+    plt.legend()
+    plt.title("Reconstruction loss epochs")
+    plt.show()
+
+
+def plot_kl_loss(model_history, n_epochs: int = 100):
+    """Plot the train and val KL loss from training."""
+    plt.plot(range(n_epochs), model_history["kl_local_train"], label="Train")
+    plt.plot(
+        range(n_epochs),
+        model_history["kl_local_validation"],
+        label="Validation",
+    )
+    plt.legend()
+    plt.title("KL loss epochs")
+    plt.show()
+
+
+def plot_pearson_random(model_history, train: bool = True, n_epochs: int = 100):
+    """Plot the train or val random vs normal pearson deconv metrics from training."""
+    if train:
+        suffix = "train"
+    else:
+        suffix = "validation"
+    plt.plot(
+        range(n_epochs),
+        model_history[f"pearson_coeff_deconv_{suffix}"],
+        label="Deconv pearson coefficient",
+    )
+    plt.plot(
+        range(n_epochs),
+        model_history[f"pearson_coeff_random_{suffix}"],
+        label="Deconv pearson coefficient random vector",
+    )
+    plt.legend()
+    plt.title(f"{suffix} metrics")
+    plt.show()
