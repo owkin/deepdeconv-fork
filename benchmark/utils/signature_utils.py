@@ -1,12 +1,9 @@
 """Different python functions useful for sanity checks in deconvolution."""
 
-import
 import anndata as ad
 import pandas as pd
-import numpy as np
 import mygene
 from ..constants import GROUPS
-
 
 def create_signature(adata: ad.AnnData,
                     signature_type: str = "almudena",

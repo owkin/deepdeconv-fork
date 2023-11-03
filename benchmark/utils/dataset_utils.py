@@ -70,4 +70,4 @@ def create_pseudobulk_dataset(adata: ad.AnnData,
   adata_pseudobulk = adata_pseudobulk[:, intersect].copy()
   G = len(intersect)
 
-  return adata_pseudobulk, ground_truth_fractions
+  return adata_pseudobulk, averaged_data, ground_truth_fractions

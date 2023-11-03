@@ -6,16 +6,82 @@ import scvi
 import os
 
 from typing import Optional, Tuple
-from .sanity_check_utils import check_model
+from .sanity_checks_utils import run_categorical_value_checks, run_incompatible_value_checks
 # mixupVI hyperparameters
 # N_EPOCHS = 300
 
+MODEL_SAVE = False
+MAX_EPOCHS = 300
+BATCH_SIZE = 1024
+TRAIN_SIZE = 0.7
+CONT_COV = None  # list of continuous covariates to include
+ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar
+ENCODE_CONT_COVARIATES = False  # True or False, whether to include cont covar
+SIGNATURE_TYPE = "pre_encoded"  # ["pre_encoded", "post_inference"]
+USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
+LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
+PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
+MIXUP_PENALTY = "l2"  # ["l2", "kl"]
+DISPERSION = "gene"  # ["gene", "gene_cell"]
+GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
 
 def fit_mixupvi(adata: ad.AnnData,
                 model_path: str,
+                cell_type_group: str,
+
 ):
+  if os.path.exists(model_path.exists()):
+      logger.info(f"Model fitted, saved in path:{model_path}, loading MixupVI...")
+      mixupvi_model = scvi.model.MixUpVI.load(model_path)
+  else:
+    CAT_COV = [cell_type_group]
+    run_categorical_value_checks(
+      cell_group=cell_type_group,
+      cat_cov=CAT_COV, # for now, only works with cell groups as categorical covariate
+      cont_cov=CONT_COV,
+      encode_covariates=ENCODE_COVARIATES,
+      encode_cont_covariates=ENCODE_CONT_COVARIATES,
+      use_batch_norm=USE_BATCH_NORM,
+      signature_type=SIGNATURE_TYPE,
+      loss_computation=LOSS_COMPUTATION,
+      pseudo_bulk=PSEUDO_BULK,
+      mixup_penalty=MIXUP_PENALTY,
+      dispersion=DISPERSION,
+      gene_likelihood=GENE_LIKELIHOOD,
+  )
+  run_incompatible_value_checks(
+      pseudo_bulk=PSEUDO_BULK,
+      loss_computation=LOSS_COMPUTATION,
+      use_batch_norm=USE_BATCH_NORM,
+      mixup_penalty=MIXUP_PENALTY,
+      gene_likelihood=GENE_LIKELIHOOD,
+  )
+  scvi.model.MixUpVI.setup_anndata(
+    adata,
+    layer="counts",
+    categorical_covariate_keys=CAT_COV,  # only cell types for now
+)
+  mixupvi_model = scvi.model.MixUpVI(
+      adata,
+      use_batch_norm=USE_BATCH_NORM,
+      signature_type=SIGNATURE_TYPE,
+      loss_computation=LOSS_COMPUTATION,
+      pseudo_bulk=PSEUDO_BULK,
+      encode_covariates=ENCODE_COVARIATES,  # always False for now, because cat covariates is only cell types
+      encode_cont_covariates=ENCODE_CONT_COVARIATES,  # if want to encode continuous covariates
+      mixup_penalty=MIXUP_PENALTY,
+      dispersion=DISPERSION,
+      gene_likelihood=GENE_LIKELIHOOD,
+  )
+  mixupvi_model.view_anndata_setup()
+  mixupvi_model.train(
+      max_epochs=MAX_EPOCHS,
+      batch_size=BATCH_SIZE,
+      train_size=TRAIN_SIZE,
+      check_val_every_n_epoch=1,
+  )
 
-
+  return mixupvi_model
 
 def fit_scvi(adata: ad.AnnData,
              model_path: str,
