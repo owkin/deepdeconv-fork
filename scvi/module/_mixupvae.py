@@ -13,8 +13,9 @@ from scvi.autotune._types import Tunable
 from scvi.distributions import NegativeBinomial, Poisson, ZeroInflatedNegativeBinomial
 from scvi.module.base import LossOutput, auto_move_data
 from scvi.nn import one_hot
-from scvi.nn import DecoderSCVI
+from scvi.nn import Encoder
 from ._vae import VAE
+from ._utils import create_random_proportion, get_pearsonr_torch
 
 # for deconvolution
 from scipy.optimize import nnls
@@ -75,7 +76,7 @@ class MixUpVAE(VAE):
         One of
 
         * ``'pre_encoded'`` - Compute the signature matrix in the input space.
-        * ``'post_encoded'`` - Compute the signature matrix inside the latent space.
+        * ``'post_inference'`` - Compute the signature matrix inside the latent space.
     loss_computation
         One of
 
@@ -86,7 +87,7 @@ class MixUpVAE(VAE):
         One of
 
         * ``'pre_encoded'`` - Create the pseudo-bulk in the input space.
-        * ``'latent_space'`` - Create the pseudo-bulk inside the latent space. Only if the loss is computed in the reconstructed space.
+        * ``'post_inference'`` - Create the pseudo-bulk inside the latent space. Only if the loss is computed in the reconstructed space.
     encode_covariates
         Whether to concatenate covariates to expression in encoder. Not used in MixUpVI,
          where we differentiate for now between caterigocal and continuous covariates.
@@ -159,19 +160,19 @@ class MixUpVAE(VAE):
     ):
         super().__init__(
             n_input=n_input,
-            n_batch=n_batch,
+            n_batch=0,  # we don't use categorical covariates for now
             n_labels=n_labels,
             n_hidden=n_hidden,
             n_latent=n_latent,
             n_layers=n_layers,
             n_continuous_cov=n_continuous_cov,
-            n_cats_per_cov=n_cats_per_cov,
+            n_cats_per_cov=None,  # we don't use categorical covariates for now
             dropout_rate=dropout_rate,
             dispersion=dispersion,
             log_variational=log_variational,
             gene_likelihood=gene_likelihood,
             latent_distribution=latent_distribution,
-            # encode_covariates=encode_covariates,
+            encode_covariates=encode_covariates,
             deeply_inject_covariates=deeply_inject_covariates,
             use_batch_norm=use_batch_norm,
             use_layer_norm=use_layer_norm,
@@ -188,22 +189,46 @@ class MixUpVAE(VAE):
         self.pseudo_bulk = pseudo_bulk
         self.encode_cont_covariates = encode_cont_covariates
         self.mixup_penalty = mixup_penalty
-        # decoder goes from n_latent-dimensional space to n_input-d data
-        n_input_decoder = n_latent + n_continuous_cov
-        use_batch_norm_decoder = use_batch_norm == "decoder" or use_batch_norm == "both"
-        use_layer_norm_decoder = use_layer_norm == "decoder" or use_layer_norm == "both"
-        _extra_decoder_kwargs = extra_decoder_kwargs or {}
-        self.decoder = DecoderSCVI(
-            n_input_decoder,
-            n_input,
-            n_cat_list=None,  # for now, we don't decode categorical variables
+        self.already_printed_warning = False
+
+        # overwrite z_encoder and l_encoder with the right n_input_encoder
+        n_input_encoder = n_input + n_continuous_cov * encode_cont_covariates
+        cat_list = [n_batch] + list([] if n_cats_per_cov is None else n_cats_per_cov)
+        encoder_cat_list = cat_list if encode_covariates else None
+        use_batch_norm_encoder = use_batch_norm == "encoder" or use_batch_norm == "both"
+        use_layer_norm_encoder = use_layer_norm == "encoder" or use_layer_norm == "both"
+        # z encoder goes from the n_input-dimensional data to an n_latent-d
+        # latent space representation
+        _extra_encoder_kwargs = extra_encoder_kwargs or {}
+        self.z_encoder = Encoder(
+            n_input_encoder,
+            n_latent,
+            n_cat_list=encoder_cat_list,
             n_layers=n_layers,
             n_hidden=n_hidden,
+            dropout_rate=dropout_rate,
+            distribution=latent_distribution,
             inject_covariates=deeply_inject_covariates,
-            use_batch_norm=use_batch_norm_decoder,
-            use_layer_norm=use_layer_norm_decoder,
-            scale_activation="softplus" if use_size_factor_key else "softmax",
-            **_extra_decoder_kwargs,
+            use_batch_norm=use_batch_norm_encoder,
+            use_layer_norm=use_layer_norm_encoder,
+            var_activation=var_activation,
+            return_dist=True,
+            **_extra_encoder_kwargs,
+        )
+        # l encoder goes from n_input-dimensional data to 1-d library size
+        self.l_encoder = Encoder(
+            n_input_encoder,
+            1,
+            n_layers=1,
+            n_cat_list=encoder_cat_list,
+            n_hidden=n_hidden,
+            dropout_rate=dropout_rate,
+            inject_covariates=deeply_inject_covariates,
+            use_batch_norm=use_batch_norm_encoder,
+            use_layer_norm=use_layer_norm_encoder,
+            var_activation=var_activation,
+            return_dist=True,
+            **_extra_encoder_kwargs,
         )
 
     def _get_generative_input(self, tensors, inference_outputs):
@@ -324,7 +349,7 @@ class MixUpVAE(VAE):
                 batch_index,  # will not be used since encode_covariates==False
                 *categorical_input,  # will not be used since encode_covariates==False
             )  # for signature, batch_index and cat_covs are not the right dimension
-        elif self.signature_type == "post_encoded":
+        elif self.signature_type == "post_inference":
             # create signature matrix - inside the latent space
             z_signature = []
             for cell_type in unique_indices:
@@ -395,7 +420,7 @@ class MixUpVAE(VAE):
         transform_batch=None,
     ):
         """Runs the generative model."""
-        if self.pseudo_bulk == "latent_space":
+        if self.pseudo_bulk == "post_inference":
             # create it from z by overwritting the one coming from inference
             z_pseudobulk = z.mean(axis=0).unsqueeze(0)
 
@@ -557,42 +582,16 @@ class MixUpVAE(VAE):
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        mixup_loss = 0
-        mean_z = torch.mean(inference_outputs["z"], axis=0)
-        if self.loss_computation == "latent_space" or self.loss_computation == "both":
-            if self.mixup_penalty == "l2":
-                # l2 penalty in latent space
-                mixup_loss += self.get_l2_mixup_loss(
-                    mean_z, inference_outputs["z_pseudobulk"].squeeze(0)
-                )
-
-            elif self.mixup_penalty == "kl":
-                # kl of mean(encoded cells) compared to reference encoded pseudobulk
-                mixup_loss += self.get_kl_mixup_loss(
-                    inference_outputs["qz"], inference_outputs["qz_pseudobulk"]
-                )  # should it be -= instead of += ?
-
-        if (
-            self.loss_computation == "reconstructed_space"
-            or self.loss_computation == "both"
-        ):
-            if self.mixup_penalty == "l2":
-                # l2 penalty in reconstructed space
-                generative_x = generative_outputs["px"].sample()
-                mean_x = torch.mean(generative_x, axis=0)
-                generative_pseudobulk = generative_outputs["px_pseudobulk"].sample()
-                mixup_loss += self.get_l2_mixup_loss(mean_x, generative_pseudobulk)
-            elif self.mixup_penalty == "kl":
-                # kl of mean(encoded cells) compared to reference encoded pseudobulk
-                mixup_loss += self.get_kl_mixup_loss(
-                    generative_outputs["px"], generative_outputs["px_pseudobulk"]
-                )  # should it be -= instead of += ?
+        mixup_loss = self.get_mix_up_loss(inference_outputs, generative_outputs)
 
         loss = torch.mean(reconst_loss + weighted_kl_local) + mixup_loss
 
-        pearson_coeff = self.get_pearsonr_torch(
+        # correlation in latent space
+        mean_z = torch.mean(inference_outputs["z"], axis=0)
+        pearson_coeff = get_pearsonr_torch(
             mean_z, inference_outputs["z_pseudobulk"].squeeze(0)
         )
+
         # deconvolution in latent space
         predicted_proportions = nnls(
             inference_outputs["z_signature"].detach().cpu().numpy().T,
@@ -608,18 +607,14 @@ class MixUpVAE(VAE):
             / np.linalg.norm(predicted_proportions)
         )
         pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
-        # random proportions
-        random_proportions = self.create_random_proportion(
+
+        # random proportions correlation
+        random_proportions = create_random_proportion(
             n_classes=len(proportions_array), n_non_zero=None
         )
         pearson_coeff_random = pearsonr(proportions_array, random_proportions)[0]
 
         # logging
-        reconst_losses = {
-            "reconst_loss": reconst_loss,
-            "mixup_penalty": mixup_loss,
-        }  # never used ?
-
         kl_local = {
             "kl_divergence_l": kl_divergence_l,
             "kl_divergence_z": kl_divergence_z,
@@ -638,101 +633,60 @@ class MixUpVAE(VAE):
             },
         )
 
-    def create_random_proportion(
-        self, n_classes: int, n_non_zero: Optional[int] = None
-    ) -> np.ndarray:
-        """Create a random proportion vector of size n_classes.
-
-        The n_non_zero parameter allows to set the number
-        of non-zero components of the random discrete density vector.
-        """
-        if n_non_zero is None:
-            n_non_zero = n_classes
-
-        proportion_vector = np.zeros(
-            n_classes,
-        )
-
-        proportion_vector[:n_non_zero] = np.random.rand(n_non_zero)
-
-        proportion_vector = proportion_vector / proportion_vector.sum()
-        return np.random.permutation(proportion_vector)
-
-    def get_l2_mixup_loss(self, single_cells, pseudobulk):
-        """Compute L2 loss between average of single cells and pseudobulk."""
-        mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2)
+    def get_mix_up_loss(self, inference_outputs, generative_outputs):
+        """Compute L2 loss or KL divergence between single cells average and pseudobulk."""
+        if self.mixup_penalty == "l2":
+            # l2 penalty between mean(cells) and pseudobulk
+            if self.loss_computation == "latent_space":
+                mean_single_cells = torch.mean(inference_outputs["z"], axis=0)
+                pseudobulk = inference_outputs["z_pseudobulk"]
+            elif self.loss_computation == "reconstructed_space":
+                if not self.already_printed_warning:
+                    logger.warn(
+                        "Sampling with the reparametrization trick is not possible with"
+                        " NegativeBinomial or ZeroInflatedNegativeBinomial "
+                        "distributions. Therefore, the MixUp penalty will not be used "
+                        "during gradient descent."
+                    )
+                    self.already_printed_warning = True
+                mean_single_cells = torch.mean(
+                    generative_outputs["px"].sample(), axis=0
+                )
+                pseudobulk = generative_outputs["px_pseudobulk"].sample()
+            mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2)
+        elif self.mixup_penalty == "kl":
+            # kl of mean(cells) compared to reference pseudobulk
+            if self.loss_computation == "latent_space":
+                mean_averaged_cells = inference_outputs["qz"].mean.mean(axis=0)
+                std_averaged_cells = inference_outputs["qz"].variance.sum(
+                    axis=0
+                ).sqrt() / len(inference_outputs["qz"].loc)
+                averaged_cells_distrib = Normal(mean_averaged_cells, std_averaged_cells)
+            elif self.loss_computation == "reconstructed_space":
+                distrib_type = str(generative_outputs["px"].__class__).split(".")[-1][
+                    :-2
+                ]
+                if distrib_type == "Poisson":
+                    rate_averaged_cells = generative_outputs["px"].rate.mean(axis=0)
+                    averaged_cells_distrib = Poisson(rate_averaged_cells)
+                elif self.dispersion != "gene":
+                    raise NotImplementedError(
+                        "The parameters of the sum of independant variables following "
+                        "negative binomials with varying dispersion is not computable yet."
+                    )
+                elif distrib_type == "NegativeBinomial":
+                    # only works because dispersion is constant across cells
+                    mean_averaged_cells = generative_outputs["px"].mu.mean(axis=0)
+                    averaged_cells_distrib = NegativeBinomial(rate_averaged_cells)
+                elif self.gene_likelihood == "ZeroInflatedNegativeBinomial":
+                    # not yet implemented because of the zero inflation
+                    raise NotImplementedError(
+                        "The parameters of the sum of independant variables following "
+                        "zero-inflated negative binomials is not computable yet."
+                    )
+            mixup_penalty = kl(
+                averaged_cells_distrib, generative_outputs["px_pseudobulk"]
+            ).sum(
+                dim=-1
+            )  # should it be negative in the case of kl?
         return mixup_penalty
-
-    def get_kl_mixup_loss(
-        self, single_cells_distrib, pseudobulk_distrib, computed_space
-    ):
-        """Compute KL divergence between average of single cells distrib and pseudobulk
-        distribution.
-        """
-        if computed_space == "latent_space":
-            mean_averaged_cells = single_cells_distrib.mean.mean(axis=0)
-            std_averaged_cells = single_cells_distrib.variance.sum(axis=0).sqrt() / len(
-                single_cells_distrib.loc
-            )
-            averaged_cells_distrib = Normal(mean_averaged_cells, std_averaged_cells)
-            mixup_penalty = kl(averaged_cells_distrib, pseudobulk_distrib).sum(dim=-1)
-        elif computed_space == "reconstructed_space":
-            if self.gene_likelihood == "poisson":
-                rate_averaged_cells = single_cells_distrib.rate.mean(axis=0)
-                averaged_cells_distrib = Poisson(rate_averaged_cells)
-                mixup_penalty = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
-                    dim=-1
-                )
-            elif self.dispersion != "gene":
-                raise NotImplementedError(
-                    "The parameters of the sum of independant variables following "
-                    "negative binomials with varying dispersion is not computable yet."
-                )
-            elif self.gene_likelihood == "nb":
-                # only works because dispersion is constant across cells
-                mean_averaged_cells = single_cells_distrib.mu.mean(axis=0)
-                averaged_cells_distrib = NegativeBinomial(rate_averaged_cells)
-                mixup_penalty = kl(averaged_cells_distrib, pseudobulk_distrib).sum(
-                    dim=-1
-                )
-            elif self.gene_likelihood == "zinb":
-                # not yet implemented because of the zero inflation
-                raise NotImplementedError(
-                    "The parameters of the sum of independant variables following "
-                    "zero-inflated negative binomials is not computable yet."
-                )
-
-        return mixup_penalty
-
-    def get_pearsonr_torch(self, x, y):
-        """
-        Mimics `scipy.stats.pearsonr`
-        Arguments
-        ---------
-        x : 1D torch.Tensor
-        y : 1D torch.Tensor
-        Returns
-        -------
-        r_val : float
-            pearsonr correlation coefficient between x and y
-
-        Scipy docs ref:
-            https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html
-
-        Scipy code ref:
-            https://github.com/scipy/scipy/blob/v0.19.0/scipy/stats/stats.py#L2975-L3033
-        Example:
-            >>> x = np.random.randn(100)
-            >>> y = np.random.randn(100)
-            >>> sp_corr = scipy.stats.pearsonr(x, y)[0]
-            >>> th_corr = pearsonr(torch.from_numpy(x), torch.from_numpy(y))
-            >>> np.allclose(sp_corr, th_corr)
-        """
-        mean_x = torch.mean(x)
-        mean_y = torch.mean(y)
-        xm = x.sub(mean_x)
-        ym = y.sub(mean_y)
-        r_num = xm.dot(ym)
-        r_den = torch.norm(xm, 2) * torch.norm(ym, 2)
-        r_val = r_num / r_den
-        return r_val
