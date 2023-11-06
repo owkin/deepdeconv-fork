@@ -1,29 +1,33 @@
 """Pseudobulk benchmark."""
 # %%
-import os
-import random
-import numpy as np
 import pandas as pd
 import scanpy as sc
 import scvi
-import matplotlib.pyplot as plt
 from loguru import logger
-import anndata as ad
 
-from .utils.dataset_utils import preprocess_scrna, split_dataset, create_pseudobulk_dataset
-from .utils.benchmark_utils import perform_nnls, perform_latent_deconv, compute_correlations, create_random_proportion
-from .utils.latent_signature_utils import create_latent_signature
-from .utils.training_utils import fit_scvi, fit_destvi, fit_mixupvi
-from .utils.signature_utils import create_signature, add_cell_types_grouped
-from .utils.plotting_utils import plot_correlations
+from benchmark_utils import (
+    preprocess_scrna,
+    split_dataset,
+    create_pseudobulk_dataset,
+    create_latent_signature,
+    fit_scvi,
+    fit_destvi,
+    fit_mixupvi,
+    create_signature,
+    add_cell_types_grouped,
+    perform_nnls,
+    perform_latent_deconv,
+    compute_correlations,
+    plot_deconv_results,
+)
 
 # %% params
-DATASET = "TOY" # "CTI"
-SIGNATURE_CHOICE = "almudena"  # ["laughney", "almudena", "crosstissue_general", "crosstissue_granular_updated"]
+DATASET = "CTI" # "TOY"
+SIGNATURE_CHOICE = "crosstissue_granular_updated"  # ["laughney", "almudena", "crosstissue_general", "crosstissue_granular_updated"]
 CELL_TYPE_GROUP = "primary_groups"  # ["primary_groups", "precise_groups"]
 
 # %% Load scRNAseq dataset
-logger.info("Loading single-cell dataset ...")
+logger.info(f"Loading single-cell dataset: {DATASET} ...")
 
 if DATASET == "TOY":
     adata = scvi.data.heart_cell_atlas_subsampled()
@@ -32,8 +36,8 @@ elif DATASET == "CTI":
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
     preprocess_scrna(adata, keep_genes=2500)
 
-
 #%% load signature
+logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {CELL_TYPE_GROUP}...")
 signature = create_signature(adata,
                              signature_type=SIGNATURE_CHOICE,
                              group=CELL_TYPE_GROUP)
@@ -114,4 +118,4 @@ df_predicted_proportions.loc[:, "DestVI"] = deconv_results
 df_test_correlations.loc[:, "DestVI"] = correlations.values
 
 ### % Plots
-plot_correlations(df_test_correlations, "test")
+plot_deconv_results(df_test_correlations, "test")

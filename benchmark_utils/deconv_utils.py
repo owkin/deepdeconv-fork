@@ -25,7 +25,7 @@ def perform_nnls(signature, averaged_data):
     )  # to sum up to 1
     return deconv_results
 
-def perform_latent_deconv(adata_pseudobulk, model, latent_signature):
+def perform_latent_deconv(adata_pseudobulk, latent_signature, model):
     """Perform deconvolution in latent space using the nnls method."""
     model.eval()
     with torch.no_grad():
@@ -33,7 +33,7 @@ def perform_latent_deconv(adata_pseudobulk, model, latent_signature):
     deconv = LinearRegression(positive=True).fit(latent_signature,
                                                  latent_pseudobulk)
     deconv_results = pd.DataFrame(
-        deconv.coef_, index=averaged_data.index, columns=signature.columns
+        deconv.coef_, index=adata_pseudobulk.obs.index, columns=latent_signature.columns
     )
     deconv_results = deconv_results.div(
         deconv_results.sum(axis=1), axis=0

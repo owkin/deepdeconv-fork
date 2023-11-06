@@ -5,10 +5,11 @@ import pandas as pd
 import numpy as np
 import random
 from sklearn.model_selection import train_test_split
-from typing import Tuple
+from typing import Tuple, Optional
 
 def preprocess_scrna(adata: ad.AnnData,
-                     keep_genes: int = 2000):
+                     keep_genes: int = 2000,
+                     batch_key: Optional[str] = None):
   """Preprocess single-cell RNA data for deconvolution benchmarking."""
   sc.pp.filter_genes(adata, min_counts=3)
   adata.layers["counts"] = adata.X.copy()  # preserve counts
@@ -21,7 +22,7 @@ def preprocess_scrna(adata: ad.AnnData,
       subset=True,
       layer="counts",
       flavor="seurat_v3",
-      batch_key="cell_source",
+      batch_key=batch_key,
   )
 
 def split_dataset(adata: ad.AnnData,

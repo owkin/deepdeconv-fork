@@ -3,7 +3,7 @@
 import anndata as ad
 import pandas as pd
 import mygene
-from ..constants import GROUPS
+from constants import GROUPS
 
 def create_signature(adata: ad.AnnData,
                     signature_type: str = "almudena",
@@ -39,7 +39,7 @@ def create_signature(adata: ad.AnnData,
       ensg_names = map_hgnc_to_ensg(genes, adata)
       signature = signature_type.copy()
       signature.index = ensg_names
-  elif signature_type in set("crosstissue_general", "crosstissue_granular_updated"):
+  elif signature_type in ["crosstissue_general", "crosstissue_granular_updated"]:
       signature = signature.copy()
   # intersection between all genes and marker genes
   intersection = list(set(adata.var_names).intersection(signature.index))
@@ -47,9 +47,13 @@ def create_signature(adata: ad.AnnData,
   return signature
 
 
-def add_cell_types_grouped(adata: ad.Anndata,
+def add_cell_types_grouped(adata: ad.AnnData,
                            group: str = "primary_groups"):
   """Add the cell types grouped columns in Anndata according to the grouping choice."""
+  try:
+      group in ["updated_granular_groups", "primary_groups", "precise_groups"]
+  except:
+      raise ValueError("Incompatible group choice. group should be in ['updated_granular_groups', 'primary_groups', 'precise_groups']")
   groups = GROUPS[group]
   group_correspondence = {}
   for k, v in groups.items():

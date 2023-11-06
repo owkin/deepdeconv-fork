@@ -11,9 +11,9 @@ from .sanity_checks_utils import run_categorical_value_checks, run_incompatible_
 # N_EPOCHS = 300
 
 MODEL_SAVE = False
-MAX_EPOCHS = 300
+MAX_EPOCHS = 10
 BATCH_SIZE = 1024
-TRAIN_SIZE = 0.7
+TRAIN_SIZE = 1.0
 CONT_COV = None  # list of continuous covariates to include
 ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar
 ENCODE_CONT_COVARIATES = False  # True or False, whether to include cont covar
@@ -86,22 +86,22 @@ def fit_mixupvi(adata: ad.AnnData,
 def fit_scvi(adata: ad.AnnData,
              model_path: str,
              batch_key: Optional[str] = "batch_key"
-             ) -> scvi.model.scVI:
+             ) -> scvi.model.SCVI:
   """Fit scVI model to single-cell RNA data."""
   if os.path.exists(model_path.exists()):
       logger.info(f"Model fitted, saved in path:{model_path}, loading scVI...")
-      scvi_model = scvi.model.scVI.load(model_path)
+      scvi_model = scvi.model.SCVI.load(model_path)
   else:
-    scvi.model.scVI.setup_anndata(
+    scvi.model.SCVI.setup_anndata(
       adata,
       layer="counts",
       # categorical_covariate_keys=["cell_type"],
       # batch_index="batch_key", # no other cat covariate for now
       # continuous_covariate_keys=["percent_mito", "percent_ribo"],
     )
-    scvi_model = scvi.model.scVI(adata)
+    scvi_model = scvi.model.SCVI(adata)
     scvi_model.view_anndata_setup()
-    scvi_model.train(max_epochs=300, batch_size=128, train_size=1.0, check_val_every_n_epoch=5)
+    scvi_model.train(max_epochs=MAX_EPOCHS, batch_size=128, train_size=TRAIN_SIZE, check_val_every_n_epoch=5)
     scvi_model.save(model_path)
 
     return scvi_model
@@ -115,10 +115,10 @@ def fit_destvi(adata: ad.AnnData,
   # condscVI
   if os.path.exists(model_path_1):
       logger.info(f"Model fitted, saved in path:{model_path_1}, loading condscVI...")
-      condscvi_model = scvi.model.condSCVI.load(model_path_1)
+      condscvi_model = scvi.model.CondSCVI.load(model_path_1)
   else:
-    scvi.mode.CondSCVI.setup_anndata(
-        adata,s
+    scvi.model.CondSCVI.setup_anndata(
+        adata,
         layer="counts",
         labels_key="cell_type"
     )
@@ -129,7 +129,7 @@ def fit_destvi(adata: ad.AnnData,
   # DestVI
   if os.path.exists(model_path_2.exists()):
       logger.info(f"Model fitted, saved in path:{model_path_2}, loading DestVI...")
-      destvi_model = scvi.model.scVI.load(model_path_2)
+      destvi_model = scvi.model.DestVI.load(model_path_2)
   else:
       scvi.model.DestVI.setup_anndata(
           adata_pseudobulk,

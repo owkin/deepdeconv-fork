@@ -1,5 +1,5 @@
 """Utilities to create latent signatures from scvi-like (deep generative) models."""
-from typing import Optional, Tupple
+from typing import Optional, Tuple
 import scvi
 import anndata as ad
 import numpy as np
