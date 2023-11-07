@@ -25,17 +25,16 @@ from benchmark_utils import (
 
 # %% params
 DATASET = "CTI"  # "TOY"
-SIGNATURE_CHOICE = "crosstissue_general"  # ["laughney", "almudena", "crosstissue_general", "crosstissue_granular_updated"]
+SIGNATURE_CHOICE = "crosstissue_general"  # ["laughney", "crosstissue_granular_updated"]
 CELL_TYPE_GROUP = "primary_groups" #"updated_granular_groups"  # ["primary_groups", "precise_groups"]
 
 # %% Load scRNAseq dataset
 logger.info(f"Loading single-cell dataset: {DATASET} ...")
-
 if DATASET == "TOY":
     adata = scvi.data.heart_cell_atlas_subsampled()
     preprocess_scrna(adata, keep_genes=1200)
 elif DATASET == "CTI":
-    adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
+    adata = sc.read("/home/owkin/deepdeconv/data/cti_adata.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
                      batch_key="donor_id")

@@ -55,21 +55,22 @@ def create_pseudobulk_dataset(
     """Create pseudobulk dataset from single-cell RNA data."""
     random.seed(random.randint(0, 1000))
     averaged_data = []
-    ground_truth_fractions = []
+    groundtruth_fractions = []
     n_cells = 2000
     for i in range(n_sample):
         cell_sample = random.sample(list(adata.obs_names), n_cells)
         adata_sample = adata[cell_sample, :]
-        ground_truth_frac = adata_sample.obs[cell_type_group].value_counts() / n_cells
-        ground_truth_fractions.append(ground_truth_frac)
+        groundtruth_frac = adata_sample.obs[cell_type_group].value_counts() / n_cells
+        groundtruth_fractions.append(groundtruth_frac)
         if aggregation_method == "mean":
-            averaged_data.append(adata_sample.raw.X.mean(axis=0).tolist()[0])
+            averaged_data.append(adata_sample[:, adata.var_names].layers["counts"].mean(axis=0).tolist()[0])
         else:
-            averaged_data.append(adata_sample.raw.X.sum(axis=0).tolist()[0])
+            averaged_data.append(adata_sample[:, adata.var_names].layers["counts"].sum(axis=0).tolist()[0])
 
 
     averaged_data = pd.DataFrame(
-        averaged_data, index=list(range(n_sample)), columns=adata_sample.raw.var_names
+        averaged_data, index=list(range(n_sample)),
+        columns=adata_sample.var_names
     )
     # pseudobulk dataset
     adata_pseudobulk = ad.AnnData(X=averaged_data.values)
@@ -86,4 +87,4 @@ def create_pseudobulk_dataset(
     adata_pseudobulk = adata_pseudobulk[:, intersect].copy()
     adata_pseudobulk.obs[cell_type_group] = "B"
     G = len(intersect)
-    return adata_pseudobulk, ground_truth_fractions
+    return adata_pseudobulk, groundtruth_fractions

@@ -7,7 +7,9 @@ from constants import GROUPS
 
 
 def create_signature(
-    adata: ad.AnnData, signature_type: str = "almudena", group: str = "primary_groups"
+    adata: ad.AnnData,
+    signature_type: str = "crosstissue_general",
+    group: str = "primary_groups"
 ):
     """Create the signature matrix from the single cell dataset."""
     if (
@@ -21,7 +23,7 @@ def create_signature(
         signature = pd.read_csv(
             "/home/owkin/project/laughney_signature.csv", index_col=0
         ).drop(["Endothelial", "Malignant", "Stroma", "Epithelial"], axis=1)
-    elif signature_type == "almudena":
+    elif signature_type == "crosstissue_general":
         signature = read_almudena_signature(
             "/home/owkin/project/Almudena/Output/Crosstiss_Immune_norm/CTI.txt"
         )  # it is the normalised one (using adata.X and not adata.raw.X, to match this code)
