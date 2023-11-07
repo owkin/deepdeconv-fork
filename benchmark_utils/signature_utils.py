@@ -5,66 +5,76 @@ import pandas as pd
 import mygene
 from constants import GROUPS
 
-def create_signature(adata: ad.AnnData,
-                    signature_type: str = "almudena",
-                     group: str = "primary_groups"):
-  """Create the signature matrix from the single cell dataset."""
-  if signature_type in ["laughney", "crosstissue_general"] \
-        and group != "primary_groups":
-    raise ValueError("Incompatabile number of cell types between the signature matrix and the grouping chosen for the dataset.")
-  if signature_type == "laughney":
-    signature = pd.read_csv(
-        "/home/owkin/project/laughney_signature.csv", index_col=0
-    ).drop(["Endothelial", "Malignant", "Stroma", "Epithelial"], axis=1)
-  elif signature_type == "almudena":
-    signature = read_almudena_signature(
-        "/home/owkin/project/Almudena/Output/Crosstiss_Immune_norm/CTI.txt"
-    )  # it is the normalised one (using adata.X and not adata.raw.X, to match this code)
-  # elif signature_type == "crosstissue_general":
-  elif signature_type == "crosstissue_granular_updated":
-    signature = read_almudena_signature(
-      "/home/owkin/project/Simon/CTI_granular_updated_ensg.txt"
-      )
-  if signature_type == "laughney":
-      # map the HGNC notation to ENSG if the signature matrix uses HGNC notation
-      mg = mygene.MyGeneInfo()
-      genes = mg.querymany(
-          signature.index,
-          scopes="symbol",
-          fields=["ensembl"],
-          species="human",
-          verbose=False,
-          as_dataframe=True,
-      )
-      ensg_names = map_hgnc_to_ensg(genes, adata)
-      signature = signature_type.copy()
-      signature.index = ensg_names
-  elif signature_type in ["crosstissue_general", "crosstissue_granular_updated"]:
-      signature = signature.copy()
-  # intersection between all genes and marker genes
-  intersection = list(set(adata.var_names).intersection(signature.index))
-  signature = signature.loc[intersection]
-  return signature
+
+def create_signature(
+    adata: ad.AnnData, signature_type: str = "almudena", group: str = "primary_groups"
+):
+    """Create the signature matrix from the single cell dataset."""
+    if (
+        signature_type in ["laughney", "crosstissue_general"]
+        and group != "primary_groups"
+    ):
+        raise ValueError(
+            "Incompatabile number of cell types between the signature matrix and the grouping chosen for the dataset."
+        )
+    if signature_type == "laughney":
+        signature = pd.read_csv(
+            "/home/owkin/project/laughney_signature.csv", index_col=0
+        ).drop(["Endothelial", "Malignant", "Stroma", "Epithelial"], axis=1)
+    elif signature_type == "almudena":
+        signature = read_almudena_signature(
+            "/home/owkin/project/Almudena/Output/Crosstiss_Immune_norm/CTI.txt"
+        )  # it is the normalised one (using adata.X and not adata.raw.X, to match this code)
+    # elif signature_type == "crosstissue_general":
+    elif signature_type == "crosstissue_granular_updated":
+        signature = read_almudena_signature(
+            "/home/owkin/project/Simon/CTI_granular_updated_ensg.txt"
+        )
+    if signature_type == "laughney":
+        # map the HGNC notation to ENSG if the signature matrix uses HGNC notation
+        mg = mygene.MyGeneInfo()
+        genes = mg.querymany(
+            signature.index,
+            scopes="symbol",
+            fields=["ensembl"],
+            species="human",
+            verbose=False,
+            as_dataframe=True,
+        )
+        ensg_names = map_hgnc_to_ensg(genes, adata)
+        signature = signature_type.copy()
+        signature.index = ensg_names
+    elif signature_type in ["crosstissue_general", "crosstissue_granular_updated"]:
+        signature = signature.copy()
+    # intersection between all genes and marker genes
+    intersection = list(set(adata.var_names).intersection(signature.index))
+    signature = signature.loc[intersection]
+    return signature
 
 
-def add_cell_types_grouped(adata: ad.AnnData,
-                           group: str = "primary_groups"):
-  """Add the cell types grouped columns in Anndata according to the grouping choice."""
-  try:
-      group in ["updated_granular_groups", "primary_groups", "precise_groups"]
-  except:
-      raise ValueError("Incompatible group choice. group should be in ['updated_granular_groups', 'primary_groups', 'precise_groups']")
-  groups = GROUPS[group]
-  group_correspondence = {}
-  for k, v in groups.items():
-      for cell_type in v:
-          group_correspondence[cell_type] = k
+def add_cell_types_grouped(
+    adata: ad.AnnData, group: str = "primary_groups"
+) -> ad.AnnData:
+    """Add the cell types grouped columns in Anndata according to the grouping choice."""
+    try:
+        group in ["updated_granular_groups", "primary_groups", "precise_groups"]
+    except:
+        raise ValueError(
+            "Incompatible group choice. group should be in ['updated_granular_groups', 'primary_groups', 'precise_groups']"
+        )
+    groups = GROUPS[group]
+    group_correspondence = {}
+    for k, v in groups.items():
+        for cell_type in v:
+            group_correspondence[cell_type] = k
 
-  adata.obs["cell_types_grouped"] = [
-      group_correspondence[cell_type] for cell_type in adata.obs.Manually_curated_celltype
-  ]
-  index_to_keep = adata.obs.loc[adata.obs["cell_types_grouped"] != "To remove"].index
-  adata = adata[index_to_keep]
+    adata.obs[group] = [
+        group_correspondence[cell_type]
+        for cell_type in adata.obs.Manually_curated_celltype
+    ]
+    index_to_keep = adata.obs.loc[adata.obs[group] != "To remove"].index
+    adata = adata[index_to_keep]
+    return adata
 
 
 def read_almudena_signature(path):

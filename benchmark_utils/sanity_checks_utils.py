@@ -87,6 +87,7 @@ def run_categorical_value_checks(
         "primary_groups",
         "precise_groups",
         "updated_granular_groups",
+        "cell_types_grouped",
     ]:
         raise NotImplementedError(
             "For now, the following cell category granularities are implemented: "

@@ -4,53 +4,85 @@ import scanpy as sc
 import anndata as ad
 import pandas as pd
 import numpy as np
-import random
+from typing import Optional, Union
+import scvi
 
-from typing import Tuple, Optional
+from typing import Optional
 import scipy.stats
 from sklearn.linear_model import LinearRegression
 
 import torch
 
-def perform_nnls(signature, averaged_data):
+
+def perform_nnls(signature: pd.DataFrame,
+                 adata_pseudobulk: ad.AnnData):
     """Perform deconvolution using the nnls method.
     It will be performed as many times as there are samples in averaged_data.
     """
-    deconv = LinearRegression(positive=True).fit(signature, averaged_data.T)
+    genes = np.intersect1d(adata_pseudobulk.var_names, signature.index)
+    X = adata_pseudobulk[:, genes].layers["relative_counts"].T
+    deconv = LinearRegression(positive=True).fit(
+        signature, X
+    )
     deconv_results = pd.DataFrame(
-        deconv.coef_, index=averaged_data.index, columns=signature.columns
+        deconv.coef_, index=adata_pseudobulk.obs_names, columns=signature.columns
     )
     deconv_results = deconv_results.div(
         deconv_results.sum(axis=1), axis=0
     )  # to sum up to 1
     return deconv_results
 
-def perform_latent_deconv(adata_pseudobulk, latent_signature, model):
+
+def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
+                          adata_latent_signature: ad.AnnData,
+                          model: Optional[Union[scvi.model.SCVI, scvi.model.MixUpVI]]):
     """Perform deconvolution in latent space using the nnls method."""
-    model.eval()
     with torch.no_grad():
         latent_pseudobulk = model.get_latent_representation(adata_pseudobulk)
-    deconv = LinearRegression(positive=True).fit(latent_signature,
-                                                 latent_pseudobulk)
+    deconv = LinearRegression(positive=True).fit(adata_latent_signature.X.T,
+                                                 latent_pseudobulk.T)
     deconv_results = pd.DataFrame(
-        deconv.coef_, index=adata_pseudobulk.obs.index, columns=latent_signature.columns
+        deconv.coef_,
+        index=adata_pseudobulk.obs_names,
+        columns=adata_latent_signature.obs["cell type"]
     )
     deconv_results = deconv_results.div(
         deconv_results.sum(axis=1), axis=0
     )  # to sum up to 1
     return deconv_results
+
 
 def compute_correlations(deconv_results, ground_truth_fractions):
     """Compute n_sample pairwise correlations between the deconvolution results and the
     ground truth fractions.
     """
-    deconv_results = deconv_results[ground_truth_fractions.columns] # to align order of columsn
-    correlations = [scipy.stats.pearsonr(ground_truth_fractions.iloc[i],
-                                         deconv_results.iloc[i]).statistic
-                                         for i in range(len(deconv_results))]
+    deconv_results = deconv_results[
+        ground_truth_fractions.columns
+    ]  # to align order of columsn
+    correlations = [
+        scipy.stats.pearsonr(
+            ground_truth_fractions.iloc[i], deconv_results.iloc[i]
+        ).statistic
+        for i in range(len(deconv_results))
+    ]
     correlations = pd.DataFrame({"correlations": correlations})
-    correlations["Method"] = "nnls"  # add all the deconv methods
     return correlations
+
+
+def compute_group_correlations(deconv_results, ground_truth_fractions):
+    """Compute n_sample pairwise correlations between groups (here cell types)."""
+    deconv_results = deconv_results[
+        ground_truth_fractions.columns
+    ]  # to align order of columsn
+    correlations = [
+        scipy.stats.pearsonr(
+            ground_truth_fractions.T.iloc[i], deconv_results.T.iloc[i]
+        ).statistic
+        for i in range(len(deconv_results.T))
+    ]
+    correlations = pd.DataFrame({"correlations": correlations})
+    return correlations
+
 
 def create_random_proportion(
     n_classes: int, n_non_zero: Optional[int] = None

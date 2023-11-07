@@ -1,13 +1,14 @@
 """Utilities to create latent signatures from scvi-like (deep generative) models."""
-from typing import Optional, Tuple
+from typing import Optional, Union
 import scvi
 import anndata as ad
 import numpy as np
 import pandas as pd
 import random
+import torch
 
-def create_anndata_pseudobulk(adata: ad.AnnData,
-                              x: np.array) -> ad.AnnData:
+
+def create_anndata_pseudobulk(adata: ad.AnnData, x: np.array) -> ad.AnnData:
     """Creates an anndata object from a pseudobulk sample.
 
     Parameters
@@ -22,11 +23,14 @@ def create_anndata_pseudobulk(adata: ad.AnnData,
     ad.AnnData
         Anndata object storing the pseudobulk array
     """
-    df_obs = pd.DataFrame.from_dict([{col: adata.obs[col].value_counts().index[0] for col in adata.obs.columns}])
+    df_obs = pd.DataFrame.from_dict(
+        [{col: adata.obs[col].value_counts().index[0] for col in adata.obs.columns}]
+    )
     adata_pseudobulk = ad.AnnData(X=x, obs=df_obs)
     adata_pseudobulk.layers["counts"] = np.copy(x)
 
     return adata_pseudobulk
+
 
 def create_latent_signature(
     adata: ad.AnnData,
@@ -36,7 +40,7 @@ def create_latent_signature(
     cell_type_column: str = "cell_type",
     count_key: Optional[str] = "counts",
     representation_key: Optional[str] = "X_scvi",
-    model: Optional[scvi.model.SCVI] = None,
+    model: Optional[Union[scvi.model.SCVI, scvi.model.MixUpVI]] = None,
 ) -> ad.AnnData:
     """Make cell type representations from a single cell dataset represented with scvi.
 
@@ -96,39 +100,47 @@ def create_latent_signature(
     cell_type_list = []
     representation_list: list[np.ndarray] = []
     repeat_list = []
-    for cell_type in adata.obs[cell_type_column].unique():
-        for repeat in range(repeats):
-            seed = random.seed()
-            # Sample cells
-            sampled_cells = (
-                adata.obs[adata.obs[cell_type_column] == cell_type]
-                .sample(n=sc_per_pseudobulk, random_state=seed, replace=True)
-                .index
-            )
-            adata_sampled = adata[sampled_cells]
-
-            if signature_type == "pre-encoded":
-                assert (
-                    model is not None,
-                    "If representing a purified pseudo bulk (aggregate before embedding",
-                    "), must give a model",
+    with torch.no_grad():
+        for cell_type in adata.obs[cell_type_column].unique():
+            for repeat in range(repeats):
+                seed = random.seed()
+                # Sample cells
+                sampled_cells = (
+                    adata.obs[adata.obs[cell_type_column] == cell_type]
+                    .sample(n=sc_per_pseudobulk, random_state=seed, replace=True)
+                    .index
                 )
-                assert (
-                    count_key is not None
-                ), "Must give a count key if aggregating before embedding."
+                adata_sampled = adata[sampled_cells]
 
-                pseudobulk = (
-                    adata_sampled.layers[count_key].mean(axis=0).reshape(1, -1)
-                )  # .astype(int).astype(numpy.float32)
-                adata_pseudobulk = create_anndata_pseudobulk(adata_sampled, pseudobulk)
-                result = model.get_latent_representation(adata_pseudobulk).reshape(-1)
-            else:
-                raise ValueError("Only pre-encoded signatures are supported for now.")
-            repeat_list.append(repeat)
-            representation_list.append(result)
-            cell_type_list.append(cell_type)
+                if signature_type == "pre-encoded":
+                    assert (
+                        model is not None,
+                        "If representing a purified pseudo bulk (aggregate before embedding",
+                        "), must give a model",
+                    )
+                    assert (
+                        count_key is not None
+                    ), "Must give a count key if aggregating before embedding."
+
+                    pseudobulk = (
+                        adata_sampled.layers[count_key].mean(axis=0).reshape(1, -1)
+                    )  # .astype(int).astype(numpy.float32)
+                    adata_pseudobulk = create_anndata_pseudobulk(
+                        adata_sampled, pseudobulk
+                    )
+                    result = model.get_latent_representation(adata_pseudobulk).reshape(
+                        -1
+                    )
+                else:
+                    raise ValueError(
+                        "Only pre-encoded signatures are supported for now."
+                    )
+                repeat_list.append(repeat)
+                representation_list.append(result)
+                cell_type_list.append(cell_type)
     full_rpz = np.stack(representation_list, axis=0)
     obs = pd.DataFrame(pd.Series(cell_type_list, name="cell type"))
     obs["repeat"] = repeat_list
-    adata_signature = ad.AnnData(X=full_rpz, obs=obs)
-    return adata_signature.X.T, list(adata_signature.obs["cell type"])
+    adata_signature = ad.AnnData(X=full_rpz,
+                                 obs=obs)
+    return adata_signature
