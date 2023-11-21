@@ -38,9 +38,9 @@ elif DATASET == "CTI":
     preprocess_scrna(adata,
                      keep_genes=2500,
                      batch_key="donor_id")
-elif DATASET == "CTI_PROCESSED":
-    adata = sc.read("/home/owkin/cti_data/processed/cti_processed.h5ad")
-    # adata = sc.read("/home/owkin/cti_data/processed/cti_processed_batch.h5ad")
+# elif DATASET == "CTI_PROCESSED":
+# adata_processed = sc.read("/home/owkin/cti_data/processed/cti_processed.h5ad")
+# adata = sc.read("/home/owkin/cti_data/processed/cti_processed_batch.h5ad")
 
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {CELL_TYPE_GROUP}...")

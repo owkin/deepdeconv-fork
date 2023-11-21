@@ -11,7 +11,7 @@ from .sanity_checks_utils import run_categorical_value_checks, run_incompatible_
 # N_EPOCHS = 300
 
 MODEL_SAVE = False
-MAX_EPOCHS = 1
+MAX_EPOCHS = 100
 BATCH_SIZE = 1024
 TRAIN_SIZE = 1.0
 CONT_COV = None  # list of continuous covariates to include
