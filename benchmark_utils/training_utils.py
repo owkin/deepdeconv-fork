@@ -7,23 +7,23 @@ import os
 
 from typing import Optional, Tuple
 from .sanity_checks_utils import run_categorical_value_checks, run_incompatible_value_checks
-# mixupVI hyperparameters
-# N_EPOCHS = 300
 
-MODEL_SAVE = False
-MAX_EPOCHS = 1
-BATCH_SIZE = 1024
-TRAIN_SIZE = 1.0
-CONT_COV = None  # list of continuous covariates to include
-ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar
-ENCODE_CONT_COVARIATES = False  # True or False, whether to include cont covar
-SIGNATURE_TYPE = "pre_encoded"  # ["pre_encoded", "post_inference"]
-USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
-LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
-PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
-MIXUP_PENALTY = "l2"  # ["l2", "kl"]
-DISPERSION = "gene"  # ["gene", "gene_cell"]
-GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
+from constants import (
+    MAX_EPOCHS,
+    BATCH_SIZE,
+    TRAIN_SIZE,
+    BENCHMARK_CELL_TYPE_GROUP,
+    CONT_COV,
+    ENCODE_COVARIATES,
+    ENCODE_CONT_COVARIATES,
+    SIGNATURE_TYPE,
+    USE_BATCH_NORM,
+    LOSS_COMPUTATION,
+    PSEUDO_BULK,
+    MIXUP_PENALTY,
+    DISPERSION,
+    GENE_LIKELIHOOD,
+)
 
 def fit_mixupvi(adata: ad.AnnData,
                 model_path: str,
@@ -36,7 +36,7 @@ def fit_mixupvi(adata: ad.AnnData,
     else:
             CAT_COV = [cell_type_group]
             run_categorical_value_checks(
-                cell_group="cell_types_grouped", # cell_type_group,
+                cell_group=BENCHMARK_CELL_TYPE_GROUP, # cell_type_group,
                 cat_cov=CAT_COV, # for now, only works with cell groups as categorical covariate
                 cont_cov=CONT_COV,
                 encode_covariates=ENCODE_COVARIATES,

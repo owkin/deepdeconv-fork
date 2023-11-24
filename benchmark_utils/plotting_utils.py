@@ -1,25 +1,53 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 
 
-def plot_deconv_results(correlations):
+def plot_purified_deconv_results(deconv_results, only_fit_baseline_nnls, more_details=False, save=False, filename="test"):
+    """Plot the deconv results from sanity check 1"""
+    if not more_details:
+        if only_fit_baseline_nnls:
+            deconv_results = deconv_results.loc[
+                deconv_results["Cell type predicted"] == deconv_results["Cell type"]
+            ].copy()
+            deconv_results["Method"] = "NNLS"
+        hue = "Method"
+    else:
+        hue = "Cell type predicted"
+        
+    plt.clf()
     sns.set_style("whitegrid")
-    boxplot = sns.boxplot(correlations, y="correlations", x="Method")
-    medians = correlations.groupby(["Method"])["correlations"].median().round(4)
-    vertical_offset = (
-        correlations["correlations"].median() * 0.0005
-    )  # for non-overlapping display
-    for xtick in boxplot.get_xticks():  # show the median value
-        boxplot.text(
-            xtick,
-            medians[xtick] + vertical_offset,
-            medians[xtick],
-            horizontalalignment="center",
-            size="x-small",
-            color="w",
-            weight="semibold",
-        )
+    sns.stripplot(
+        data=deconv_results, x="Cell type", y="Estimated Fraction", hue=hue
+    )
     plt.show()
+    if save:
+        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+
+
+def plot_deconv_results(correlations, save=False, filename="test"):
+    """Plot the deconv correlation results from sanity checks 2 and 3."""
+    plt.clf()
+    sns.set_style("whitegrid")
+    boxplot = sns.boxplot(correlations)
+    medians = correlations.median(numeric_only=True).round(4)
+    vertical_offset = (
+        correlations.median() * 0.0005
+    )  # for non-overlapping display
+    y_position = medians + vertical_offset
+    for xtick in range(len(medians)):  # show the median value
+        if np.isfinite(y_position[xtick]):
+            boxplot.text(
+                xtick,
+                y_position[xtick],
+                medians[xtick],
+                size="x-small",
+                color="w",
+                weight="semibold",
+            )
+    plt.show()
+    if save:
+        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
 
 
 def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
@@ -28,6 +56,7 @@ def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
         suffix = "train"
     else:
         suffix = "validation"
+    plt.clf()
     plt.plot(
         range(n_epochs),
         model_history[f"pearson_coeff_{suffix}"],
@@ -50,6 +79,7 @@ def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
 
 def plot_loss(model_history, n_epochs: int = 100):
     """Plot the train and val loss from training."""
+    plt.clf()
     plt.plot(range(n_epochs), model_history["train_loss_epoch"], label="Train")
     plt.plot(
         range(n_epochs),
@@ -63,6 +93,7 @@ def plot_loss(model_history, n_epochs: int = 100):
 
 def plot_mixup_loss(model_history, n_epochs: int = 100):
     """Plot the train and val mixup loss from training."""
+    plt.clf()
     plt.plot(range(n_epochs), model_history["mixup_penalty_train"], label="Train")
     plt.plot(
         range(n_epochs),
@@ -76,6 +107,7 @@ def plot_mixup_loss(model_history, n_epochs: int = 100):
 
 def plot_reconstruction_loss(model_history, n_epochs: int = 100):
     """Plot the train and val reconstruction loss from training."""
+    plt.clf()
     plt.plot(range(n_epochs), model_history["reconstruction_loss_train"], label="Train")
     plt.plot(
         range(n_epochs),
@@ -89,6 +121,7 @@ def plot_reconstruction_loss(model_history, n_epochs: int = 100):
 
 def plot_kl_loss(model_history, n_epochs: int = 100):
     """Plot the train and val KL loss from training."""
+    plt.clf()
     plt.plot(range(n_epochs), model_history["kl_local_train"], label="Train")
     plt.plot(
         range(n_epochs),
@@ -106,6 +139,7 @@ def plot_pearson_random(model_history, train: bool = True, n_epochs: int = 100):
         suffix = "train"
     else:
         suffix = "validation"
+    plt.clf()
     plt.plot(
         range(n_epochs),
         model_history[f"pearson_coeff_deconv_{suffix}"],

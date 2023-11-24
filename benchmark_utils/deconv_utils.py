@@ -19,10 +19,8 @@ def perform_nnls(signature: pd.DataFrame,
     """Perform deconvolution using the nnls method.
     It will be performed as many times as there are samples in averaged_data.
     """
-    genes = np.intersect1d(adata_pseudobulk.var_names, signature.index)
-    X = adata_pseudobulk[:, genes].layers["relative_counts"].T
     deconv = LinearRegression(positive=True).fit(
-        signature, X
+        signature, adata_pseudobulk.layers["relative_counts"].T
     )
     deconv_results = pd.DataFrame(
         deconv.coef_, index=adata_pseudobulk.obs_names, columns=signature.columns
@@ -54,11 +52,11 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
 
 def compute_correlations(deconv_results, ground_truth_fractions):
     """Compute n_sample pairwise correlations between the deconvolution results and the
-    ground truth fractions.
+    ground truth fractions of the n_groups (here n cell types).
     """
     deconv_results = deconv_results[
         ground_truth_fractions.columns
-    ]  # to align order of columsn
+    ]  # to align order of columns
     correlations = [
         scipy.stats.pearsonr(
             ground_truth_fractions.iloc[i], deconv_results.iloc[i]
@@ -70,10 +68,12 @@ def compute_correlations(deconv_results, ground_truth_fractions):
 
 
 def compute_group_correlations(deconv_results, ground_truth_fractions):
-    """Compute n_sample pairwise correlations between groups (here cell types)."""
+    """Compute n_groups (here n cell types) pairwise correlations between the 
+    deconvolution results and ground truth fractions of the n_samples.
+    """
     deconv_results = deconv_results[
         ground_truth_fractions.columns
-    ]  # to align order of columsn
+    ]  # to align order of columns
     correlations = [
         scipy.stats.pearsonr(
             ground_truth_fractions.T.iloc[i], deconv_results.T.iloc[i]

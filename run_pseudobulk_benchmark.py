@@ -1,167 +1,165 @@
 """Pseudobulk benchmark."""
 # %%
-import numpy as np
-import pandas as pd
 import scanpy as sc
 import scvi
 from loguru import logger
+import warnings
 
 from benchmark_utils import (
     preprocess_scrna,
-    split_dataset,
-    create_pseudobulk_dataset,
-    create_latent_signature,
+    create_purified_pseudobulk_dataset,
+    create_uniform_pseudobulk_dataset,
+    create_dirichlet_pseudobulk_dataset,
     fit_scvi,
     fit_destvi,
     fit_mixupvi,
     create_signature,
     add_cell_types_grouped,
-    perform_nnls,
-    perform_latent_deconv,
-    compute_correlations,
-    compute_group_correlations,
+    run_purified_sanity_check,
+    run_sanity_check,
+    plot_purified_deconv_results,
     plot_deconv_results,
 )
+from constants import (
+    BENCHMARK_DATASET, 
+    SIGNATURE_CHOICE, 
+    CELL_TYPE_GROUP, 
+    BENCHMARK_LOG, 
+    N_CELLS, 
+    N_SAMPLES, 
+    ONLY_FIT_BASELINE_NNLS,
+)
 
-# %% params
-DATASET = "CTI"  # "TOY"
-SIGNATURE_CHOICE = "crosstissue_general"  # ["laughney", "crosstissue_granular_updated"]
-CELL_TYPE_GROUP = "primary_groups" #"updated_granular_groups"  # ["primary_groups", "precise_groups"]
 
 # %% Load scRNAseq dataset
-logger.info(f"Loading single-cell dataset: {DATASET} ...")
-if DATASET == "TOY":
-    adata = scvi.data.heart_cell_atlas_subsampled()
-    preprocess_scrna(adata, keep_genes=1200)
-elif DATASET == "CTI":
+logger.info(f"Loading single-cell dataset: {BENCHMARK_DATASET} ...")
+if BENCHMARK_DATASET == "TOY":
+    raise NotImplementedError(
+        "For now, the toy dataset cannot be used to run the benchmark because no "
+        "signature has intersections with its genes, and no train/test split csv exists"
+    )
+    # adata = scvi.data.heart_cell_atlas_subsampled()
+    # preprocess_scrna(adata, keep_genes=1200, log=BENCHMARK_LOG)
+elif BENCHMARK_DATASET == "CTI":
     adata = sc.read("/home/owkin/deepdeconv/data/cti_adata.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
+                     log=BENCHMARK_LOG,
                      batch_key="donor_id")
-elif DATASET == "CTI_PROCESSED":
+elif BENCHMARK_DATASET == "CTI_RAW":
+    warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
+                  "adata.X will be used here")
+    adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
+    preprocess_scrna(adata,
+                     keep_genes=2500,
+                     log=BENCHMARK_LOG,
+                     batch_key="donor_id",
+    )
+elif BENCHMARK_DATASET == "CTI_PROCESSED":
     adata = sc.read("/home/owkin/cti_data/processed/cti_processed.h5ad")
     # adata = sc.read("/home/owkin/cti_data/processed/cti_processed_batch.h5ad")
 
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {CELL_TYPE_GROUP}...")
-adata = add_cell_types_grouped(adata, CELL_TYPE_GROUP)
-signature = create_signature(
+signature, intersection = create_signature(
     adata,
     signature_type=SIGNATURE_CHOICE,
-    group=CELL_TYPE_GROUP
 )
 
-# %% split train/test
-adata_train, adata_test = split_dataset(adata, stratify=CELL_TYPE_GROUP)
+# %% add cell types groups and split train/test
+adata, train_test_index = add_cell_types_grouped(adata, CELL_TYPE_GROUP)
+adata_train = adata[train_test_index["Train index"]]
+adata_test = adata[train_test_index["Test index"]]
 
-# %% Create pseudobulk dataset
-logger.info("Creating pseudobulk dataset...")
-adata_pseudobulk_train, proportions_train = create_pseudobulk_dataset(
-    adata_train, cell_type_group=CELL_TYPE_GROUP
-)
-adata_pseudobulk_test, proportions_test = create_pseudobulk_dataset(
-    adata_test, cell_type_group=CELL_TYPE_GROUP
-)
-
-# %% ground truth cell type fractions
-df_proportions_train = pd.DataFrame(
-    np.stack([proportions_train[i].values for i in range(len(proportions_train))]),
-    index=adata_pseudobulk_train.obs_names,
-    columns=list(proportions_train[0].index),
-)
-df_proportions_test = pd.DataFrame(
-    np.stack([proportions_train[i].values for i in range(len(proportions_test))]),
-    index=adata_pseudobulk_test.obs_names,
-    columns=list(proportions_test[0].index),
-)
-df_proportions_train = df_proportions_train.fillna(0)  # the Nan are cells not sampled
-df_proportions_test = df_proportions_test.fillna(0)  # the Nan are cells not sampled
 # %%
-# Create and train models
-adata_train = adata_train.copy()
-adata_test = adata_test.copy()
+if not ONLY_FIT_BASELINE_NNLS:
+    # Create and train models
+    adata_train = adata_train.copy()
+    adata_test = adata_test.copy()
 
-### %% 1. scVI
-logger.info("Fit scVI ...")
-model_path = f"models/{DATASET}_scvi.pkl"
-scvi_model = fit_scvi(adata_train, model_path)
+    ### %% 1. scVI
+    logger.info("Fit scVI ...")
+    model_path = f"models/{BENCHMARK_DATASET}_scvi.pkl"
+    scvi_model = fit_scvi(adata_train, model_path)
 
-#### %% 2. DestVI
-# logger.info("Fit DestVI ...")
-# model_path_1 = f"models/{DATASET}_condscvi.pkl"
-# model_path_2 = f"models/{DATASET}_destvi.pkl"
-# condscvi_model , destvi_model= fit_destvi(adata_train,
-#                                           adata_pseudobulk_train,
-#                                           model_path_1,
-#                                           model_path_2,
-#                                           cell_type_key=CELL_TYPE_GROUP)
+    #### %% 2. DestVI
+    # logger.info("Fit DestVI ...")
+    # adata_pseudobulk_train, df_proportions_train = create_uniform_pseudobulk_dataset(
+    #     adata_train, n_sample = N_SAMPLES, n_cells = N_CELLS,
+    # )
+    # model_path_1 = f"models/{DATASET}_condscvi.pkl"
+    # model_path_2 = f"models/{DATASET}_destvi.pkl"
+    # condscvi_model , destvi_model= fit_destvi(adata_train,
+    #                                           adata_pseudobulk_train,
+    #                                           model_path_1,
+    #                                           model_path_2,
+    #                                           cell_type_key=CELL_TYPE_GROUP)
 
-#### %% 3. MixupVI
-logger.info("Train mixupVI ...")
-model_path = f"models/{DATASET}_mixupvi.pkl"
-mixupvi_model = fit_mixupvi(adata_train, model_path, cell_type_group=CELL_TYPE_GROUP)
-#
+    #### %% 3. MixupVI
+    logger.info("Train mixupVI ...")
+    model_path = f"models/{BENCHMARK_DATASET}_mixupvi.pkl"
+    mixupvi_model = fit_mixupvi(adata_train, model_path, cell_type_group=CELL_TYPE_GROUP)
+else:
+    scvi_model = None
+    # destvi_model = None
+    mixupvi_model = None
 
-# %% Deconvolution
-df_test_correlations = pd.DataFrame(
-    index=adata_pseudobulk_test.obs_names, columns=["scVI", "MixupVI", "NNLS"]
-)  # "Random", "DestVI"]
-df_test_group_correlations = pd.DataFrame(
-    index=df_proportions_test.columns, columns=["scVI", "MixupVI", "NNLS"]
+# %% Sanity check 1
+adata_pseudobulk_test = create_purified_pseudobulk_dataset(
+    adata_test
 )
-### % Random proportions
-# TO DO:
-#
-
-### % Linear regression (NNLS)
-deconv_results = perform_nnls(signature, adata_pseudobulk_test)
-correlations = compute_correlations(deconv_results, df_proportions_test)
-group_correlations = compute_group_correlations(deconv_results, df_proportions_test)
-df_test_correlations.loc[:, "NNLS"] = correlations.values
-df_test_group_correlations.loc[:, "NNLS"] = group_correlations.values
-
-### % scVI
-adata_latent_signature = create_latent_signature(
-    adata=adata_test,
-    model=scvi_model,
-    sc_per_pseudobulk=2000,
-    cell_type_column=CELL_TYPE_GROUP,
+deconv_results = run_purified_sanity_check(
+    adata_train=adata_train, 
+    adata_pseudobulk_test=adata_pseudobulk_test, 
+    signature=signature, 
+    intersection=intersection, 
+    scvi_model=scvi_model, 
+    mixupvi_model=mixupvi_model,
+    only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
 )
-deconv_results = perform_latent_deconv(
-    adata_pseudobulk=adata_pseudobulk_test,
-    adata_latent_signature=adata_latent_signature,
-    model=scvi_model,
+# Plot
+plot_purified_deconv_results(
+    deconv_results,
+    only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
+    more_details=False,
+    save=False, 
+    filename="test_sanitycheck0"
 )
-correlations = compute_correlations(deconv_results, df_proportions_test)
-group_correlations = compute_group_correlations(deconv_results, df_proportions_test)
-df_test_correlations.loc[:, "scVI"] = correlations.values
-df_test_group_correlations.loc[:, "scVI"] = group_correlations.values
 
-### % MixupVI
-adata_latent_signature = create_latent_signature(
-    adata=adata_test,
-    model=mixupvi_model,
-    sc_per_pseudobulk=2000,
-    cell_type_column=CELL_TYPE_GROUP,
+# %% Sanity check 2
+adata_pseudobulk_test, df_proportions_test = create_uniform_pseudobulk_dataset(
+    adata_test, n_sample = N_SAMPLES, n_cells = N_CELLS,
 )
-deconv_results = perform_latent_deconv(
-    adata_pseudobulk=adata_pseudobulk_test,
-    adata_latent_signature=adata_latent_signature,
-    model=mixupvi_model
+df_test_correlations, df_test_group_correlations = run_sanity_check(
+    adata_train=adata_train, 
+    adata_pseudobulk_test=adata_pseudobulk_test, 
+    df_proportions_test=df_proportions_test, 
+    signature=signature, 
+    intersection=intersection, 
+    scvi_model=scvi_model,
+    mixupvi_model=mixupvi_model,
+    only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
 )
-correlations = compute_correlations(deconv_results, df_proportions_test)
-group_correlations = compute_group_correlations(deconv_results, df_proportions_test)
-df_test_correlations.loc[:, "MixupVI"] = correlations.values
-df_test_group_correlations.loc[:, "MixupVI"] = group_correlations.values
+# Plots
+plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck1")
+plot_deconv_results(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck1")
 
-### % DestVI
-# deconv_results = destvi_model.get_proportions(adata_pseudobulk_test, deterministic=True)
-# correlations = compute_correlations(deconv_results, df_proportions_test)
-# group_correlations = compute_group_correlations(deconv_results, df_proportions_test)
-# df_predicted_proportions.loc[:, "DestVI"] = deconv_results
-# df_test_correlations.loc[:, "DestVI"] = correlations.values
-# df_test_group_correlations.loc[:, "DestVI"] = group_correlations.values
+# %% Sanity check 3
+adata_pseudobulk_test, df_proportions_test = create_dirichlet_pseudobulk_dataset(
+    adata_test, prior_alphas = None, n_sample = N_SAMPLES,
+)
+df_test_correlations, df_test_group_correlations = run_sanity_check(
+    adata_train=adata_train, 
+    adata_pseudobulk_test=adata_pseudobulk_test, 
+    df_proportions_test=df_proportions_test, 
+    signature=signature, 
+    intersection=intersection, 
+    scvi_model=scvi_model,
+    mixupvi_model=mixupvi_model,
+    only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
+)
+# Plots
+plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck2")
+plot_deconv_results(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck2")
 
-### % Plots
-plot_deconv_results(df_test_correlations, "test")
-plot_deconv_results(df_test_group_correlations, "cell_type_test")
+# %%

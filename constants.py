@@ -1,3 +1,47 @@
+"""Constants and global variables to run the different deconv files."""
+
+
+## constants for run_mixupvi.py and benchmark_utils/training_utils.py
+# MixUpVI training constants
+MODEL_SAVE = False
+PATH = "/home/owkin/project/scvi_models/models/cti_linear_test"
+TRAINING_DATASET = "CTI_RAW"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+TRAINING_LOG = True # whether to log transform the data
+MAX_EPOCHS = 1
+BATCH_SIZE = 1024
+TRAIN_SIZE = 1.0 # as opposed to validation
+# MixUpVI specific constants and constraints
+TRAINING_CELL_TYPE_GROUP = (
+    "primary_groups"  # ["primary_groups", "precise_groups", "updated_granular_groups"]
+)
+CONT_COV = None  # list of continuous covariates to include
+ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar
+ENCODE_CONT_COVARIATES = False  # True or False, whether to include cont covar
+SIGNATURE_TYPE = "pre_encoded"  # ["pre_encoded", "post_inference"]
+USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
+LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
+PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
+MIXUP_PENALTY = "l2"  # ["l2", "kl"]
+DISPERSION = "gene"  # ["gene", "gene_cell"]
+GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
+
+
+## constants for run_pseudobulk_benchmark.py
+SIGNATURE_CHOICE = "crosstissue_granular_updated"  # ["laughney", "crosstissue_general", "crosstissue_granular_updated"]
+if SIGNATURE_CHOICE in ["laughney", "crosstissue_general"]:
+    BENCHMARK_CELL_TYPE_GROUP = "primary_groups"
+elif SIGNATURE_CHOICE == "crosstissue_granular_updated":
+    BENCHMARK_CELL_TYPE_GROUP = "updated_granular_groups"
+else:
+    pass # no signature was created for the "precise_groups" grouping right now
+BENCHMARK_DATASET = "CTI_RAW"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
+N_CELLS = 2000 # number of cells for creation of pseudobulk and latent pseudobulk
+N_SAMPLES = 300 # number of pseudbulk samples to create and assess for deconvolution
+ONLY_FIT_BASELINE_NNLS = True # if True, don't fit the deep learning models
+
+
+# different possibilities of cell groupings with the CTI dataset
 GROUPS = {
     "primary_groups": {
         "B": [

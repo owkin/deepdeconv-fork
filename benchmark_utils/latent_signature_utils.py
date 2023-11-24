@@ -7,37 +7,16 @@ import pandas as pd
 import random
 import torch
 
-
-def create_anndata_pseudobulk(adata: ad.AnnData, x: np.array) -> ad.AnnData:
-    """Creates an anndata object from a pseudobulk sample.
-
-    Parameters
-    ----------
-    adata: ad.AnnData
-        AnnData aobject storing training set
-    x: np.array
-        pseudobulk sample
-
-    Return
-    ------
-    ad.AnnData
-        Anndata object storing the pseudobulk array
-    """
-    df_obs = pd.DataFrame.from_dict(
-        [{col: adata.obs[col].value_counts().index[0] for col in adata.obs.columns}]
-    )
-    adata_pseudobulk = ad.AnnData(X=x, obs=df_obs)
-    adata_pseudobulk.layers["counts"] = np.copy(x)
-
-    return adata_pseudobulk
+from .dataset_utils import create_anndata_pseudobulk
 
 
 def create_latent_signature(
     adata: ad.AnnData,
     sc_per_pseudobulk: int,
     repeats: int = 1,
+    average_all_cells: bool = True,
     signature_type: str = "pre-encoded",
-    cell_type_column: str = "cell_type",
+    cell_type_column: str = "cell_types_grouped",
     count_key: Optional[str] = "counts",
     representation_key: Optional[str] = "X_scvi",
     model: Optional[Union[scvi.model.SCVI, scvi.model.MixUpVI]] = None,
@@ -50,14 +29,14 @@ def create_latent_signature(
     following way.
 
     - We sample sc_per_pseudobulk single cells of the desired cell type with replacement
+      or all cells of the given cell type if average_all_cells == True.
     - We then create the corresponding cell type representation, in one of the
     two following ways.
     - Option 1)
         If we choose to aggregate before embedding (aggregate_before_embedding flag),
         we construct a pseudobulk of these single cells (all of the same cell type)
         forming a "pure" pseudobulk of the given cell type.
-        We then take the scvi model (model) latent representation of this purified
-        pseudobulk.
+        We then take the model latent representation of this purified pseudobulk.
     - Option 2)
         If we choose to aggregate after embedding, we get the corresponding
         embeddings from the adata.obsm[(representation_key)] field of the ann data,
@@ -73,10 +52,13 @@ def create_latent_signature(
     adata: ad.AnnData
         The single cell dataset, with a cell_type_column, and a representation_key in
         the obsm if one wants to aggregate after embedding.
+    average_all_cells: bool
+        If True, then average all cells per given cell type.
     sc_per_pseudobulk: int
         The number of single cells used to construct the purified pseudobulks.
     repeats: int
-        The number of representations computed randomly for a given cell type.
+        The number of representations computed randomly for a given cell type. If 
+        average_all_cells is True, all repeats will be the same.
     aggregate_before_embedding: bool
         Perform the aggregation (average) before embedding the cell-type specific
         pseudobulk. If false, we aggregate the representations.
@@ -103,14 +85,18 @@ def create_latent_signature(
     with torch.no_grad():
         for cell_type in adata.obs[cell_type_column].unique():
             for repeat in range(repeats):
-                seed = random.seed()
                 # Sample cells
-                sampled_cells = (
-                    adata.obs[adata.obs[cell_type_column] == cell_type]
+                sampled_cells = adata.obs[adata.obs[cell_type_column] == cell_type]
+                if average_all_cells:
+                    adata_sampled = adata[sampled_cells.index]
+                else:
+                    seed = random.seed()
+                    sampled_cells = (
+                    sampled_cells
                     .sample(n=sc_per_pseudobulk, random_state=seed, replace=True)
                     .index
-                )
-                adata_sampled = adata[sampled_cells]
+                    )
+                    adata_sampled = adata[sampled_cells]
 
                 if signature_type == "pre-encoded":
                     assert (

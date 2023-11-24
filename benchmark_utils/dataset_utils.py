@@ -4,18 +4,23 @@ import anndata as ad
 import pandas as pd
 import numpy as np
 import random
+from loguru import logger
 from sklearn.model_selection import train_test_split
 from typing import Tuple, Optional
 
+from constants import GROUPS
+
 
 def preprocess_scrna(
-    adata: ad.AnnData, keep_genes: int = 2000, batch_key: Optional[str] = None
+    adata: ad.AnnData, keep_genes: int = 2000, log: bool = False, batch_key: Optional[str] = None
 ):
     """Preprocess single-cell RNA data for deconvolution benchmarking."""
     sc.pp.filter_genes(adata, min_counts=3)
     adata.layers["counts"] = adata.X.copy()  # preserve counts
     sc.pp.normalize_total(adata, target_sum=1e4)
-    sc.pp.log1p(adata)
+    if log:
+        sc.pp.log1p(adata)
+    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts
     adata.raw = adata  # freeze the state in `.raw`
     sc.pp.highly_variable_genes(
         adata,
@@ -25,66 +30,221 @@ def preprocess_scrna(
         flavor="seurat_v3",
         batch_key=batch_key,
     )
+    #TODO: add the filtering / QC steps that they perform in Servier
 
 
 def split_dataset(
     adata: ad.AnnData,
-    stratify: Optional[str] = "cell_types_grouped",
-    random_state: int = 42,
+    grouping_choice: str = "updated_granular_groups",
 ) -> Tuple[ad.AnnData, ad.AnnData]:
     """Split single-cell RNA data into train/test sets for deconvolution."""
+    # create cell types
+    groups = GROUPS[grouping_choice] 
+    group_correspondence = {}
+    for k, v in groups.items():
+        for cell_type in v:
+            group_correspondence[cell_type] = k
+    adata.obs["cell_types_grouped"] = [
+        group_correspondence[cell_type] for cell_type in adata.obs.Manually_curated_celltype
+    ]
+    # remove some cell types: you need more than 15GB memory to run that
+    index_to_keep = adata.obs.loc[adata.obs["cell_types_grouped"] != "To remove"].index
+    adata = adata[index_to_keep]
+    # build signature on train set and apply deconvo on the test set
     cell_types_train, cell_types_test = train_test_split(
         adata.obs_names,
         test_size=0.5,
-        stratify=adata.obs[stratify],
-        random_state=random_state,
+        stratify=adata.obs["cell_types_grouped"],
+        random_state=42,
     )
-
-    adata_train = adata[cell_types_train, :]
-    adata_test = adata[cell_types_test, :]
-
-    return adata_train, adata_test
+    return index_to_keep, cell_types_train, cell_types_test
 
 
-def create_pseudobulk_dataset(
+def add_cell_types_grouped(
+    adata: ad.AnnData, group: str = "primary_groups"
+) -> ad.AnnData:
+    """Add the cell types grouped columns in Anndata according to the grouping choice.
+    It uses and returns the train_test_index csv file created for the signature matrix.
+    """
+    if group == "primary_groups":
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_common.csv", index_col=1).iloc[:,1:]
+        col_name = "primary_groups"
+    elif group == "precise_groups":
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_granular.csv", index_col=1).iloc[:,1:]
+        col_name = "precise_groups"
+    elif group == "updated_granular_groups":
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_granular_updated.csv", index_col=0)
+        col_name = "precise_groups_updated"
+    adata.obs["cell_types_grouped"] = train_test_index[col_name]
+    return adata, train_test_index
+
+
+def create_anndata_pseudobulk(adata: ad.AnnData, x: np.array) -> ad.AnnData:
+    """Creates an anndata object from a pseudobulk sample.
+
+    Parameters
+    ----------
+    adata: ad.AnnData
+        AnnData aobject storing training set
+    x: np.array
+        pseudobulk sample
+
+    Return
+    ------
+    ad.AnnData
+        Anndata object storing the pseudobulk array
+    """
+    df_obs = pd.DataFrame.from_dict(
+        [{col: adata.obs[col].value_counts().index[0] for col in adata.obs.columns}]
+    )
+    if len(x.shape) > 1 and x.shape[0] > 1: 
+        # several pseudobulks, so duplicate df_obs row
+        df_obs = df_obs.loc[df_obs.index.repeat(x.shape[0])].reset_index(drop=True)
+        df_obs.index = [f"sample_{idx}" for idx in df_obs.index]
+    adata_pseudobulk = ad.AnnData(X=x, obs=df_obs)
+    adata_pseudobulk.var_names = adata.var_names
+    adata_pseudobulk.layers["counts"] = np.copy(x)
+    adata_pseudobulk.layers["relative_counts"] = np.copy(x)
+    adata_pseudobulk.raw = adata_pseudobulk
+
+    return adata_pseudobulk
+
+
+def create_purified_pseudobulk_dataset(
     adata: ad.AnnData,
-    n_sample: int = 300,
     cell_type_group: str = "cell_types_grouped",
     aggregation_method : str = "mean",
 ):
-    """Create pseudobulk dataset from single-cell RNA data."""
+    """Create pseudobulk dataset from single-cell RNA data, purified by cell types.
+    There will thus be as many deconvolutions as there are cell types, each one of them
+    only asked to infer that there is only one cell type in the pseudobulk it is trying
+    to deconvolve. This task is thus supposed to be very easy.
+    """
+    logger.info("Creating purified pseudobulk dataset...")
+    grouped = adata.obs.groupby(cell_type_group)
+    averaged_data, group = [], []
+    for group_key, group_indices in grouped.groups.items():
+        if aggregation_method == "mean":
+            averaged_data.append(adata[group_indices].layers["relative_counts"].mean(axis=0).tolist()[0])
+        else:
+            averaged_data.append(adata[group_indices].layers["relative_counts"].sum(axis=0).tolist()[0])
+        group.append(group_key)
+    averaged_data = pd.DataFrame(averaged_data, index=group, columns=adata.var_names)
+
+    # pseudobulk dataset
+    adata_pseudobulk = create_anndata_pseudobulk(adata, averaged_data.values)
+    adata_pseudobulk.obs_names = group
+
+    return adata_pseudobulk
+
+
+def create_uniform_pseudobulk_dataset(
+    adata: ad.AnnData,
+    n_sample: int = 300,
+    n_cells: int = 2000,
+    cell_type_group: str = "cell_types_grouped",
+    aggregation_method : str = "mean",
+):
+    """Create pseudobulk dataset from single-cell RNA data, randomly sampled.
+    This deconvolution task is not too hard because the pseudo-bulk have the same cell 
+    fractions than the training dataset on which was created the signature matrix. Plus,
+    when using a high n_cells (e.g. the default 2000) to create the pseudo-bulks, all 
+    n_sample pseudo-bulks will have the same cell fractions because of the high number 
+    of cells.
+    """
+    logger.info("Creating uniform pseudobulk dataset...")
     random.seed(random.randint(0, 1000))
     averaged_data = []
     groundtruth_fractions = []
-    n_cells = 2000
-    for i in range(n_sample):
+    for _ in range(n_sample):
         cell_sample = random.sample(list(adata.obs_names), n_cells)
         adata_sample = adata[cell_sample, :]
         groundtruth_frac = adata_sample.obs[cell_type_group].value_counts() / n_cells
         groundtruth_fractions.append(groundtruth_frac)
         if aggregation_method == "mean":
-            averaged_data.append(adata_sample[:, adata.var_names].layers["counts"].mean(axis=0).tolist()[0])
+            averaged_data.append(adata_sample.layers["relative_counts"].mean(axis=0).tolist()[0])
         else:
-            averaged_data.append(adata_sample[:, adata.var_names].layers["counts"].sum(axis=0).tolist()[0])
-
-
+            averaged_data.append(adata_sample.layers["relative_counts"].sum(axis=0).tolist()[0])
     averaged_data = pd.DataFrame(
-        averaged_data, index=list(range(n_sample)),
-        columns=adata_sample.var_names
+        averaged_data, index=range(n_sample),columns=adata.var_names
     )
+
     # pseudobulk dataset
-    adata_pseudobulk = ad.AnnData(X=averaged_data.values)
-    adata_pseudobulk.obs_names = [f"sample_{idx}" for idx in list(averaged_data.index)]
-    adata_pseudobulk.var_names = list(averaged_data.columns)
-    adata_pseudobulk.layers["counts"] = adata_pseudobulk.X.copy()
-    # adata_pseudobulk.obsm["spatial"] = adata_pseudobulk.obsm["location"]
-    sc.pp.normalize_total(adata_pseudobulk, target_sum=1e4)
-    adata_pseudobulk.layers["relative_counts"] = adata_pseudobulk.X.copy()
-    sc.pp.log1p(adata_pseudobulk)
-    adata_pseudobulk.raw = adata_pseudobulk
-    # filter genes to be the same on the pseudobulk data
-    intersect = np.intersect1d(adata_pseudobulk.var_names, adata.var_names)
-    adata_pseudobulk = adata_pseudobulk[:, intersect].copy()
-    adata_pseudobulk.obs[cell_type_group] = "B"
-    G = len(intersect)
+    adata_pseudobulk = create_anndata_pseudobulk(adata, averaged_data.values)
+
+    # ground truth fractions
+    groundtruth_fractions = pd.DataFrame(
+        groundtruth_fractions, 
+        index=adata_pseudobulk.obs_names, 
+        columns=groundtruth_fractions[0].index
+    )
+    groundtruth_fractions = groundtruth_fractions.fillna(
+        0
+    )  # the Nan are cells not sampled
+
+    return adata_pseudobulk, groundtruth_fractions
+
+
+def create_dirichlet_pseudobulk_dataset(
+    adata: ad.AnnData,
+    prior_alphas: np.array = None,
+    n_sample: int = 300,
+    cell_type_group: str = "cell_types_grouped",
+    aggregation_method : str = "mean",
+):
+    """Create pseudobulk dataset from single-cell RNA data, sampled from a dirichlet 
+    distribution. If a prior belief on the cell fractions (e.g. prior knowledge from
+    specific tissue), then it can be incorporated. Otherwise, it will just be a non-
+    informative prior. Then, compute dirichlet posteriors to sample cells - dirichlet is
+    conjugate to the multinomial distribution, thus giving an easy posterior 
+    calculation.
+    """
+    logger.info("Creating dirichlet pseudobulk dataset...")
+    seed = random.randint(0, 1000)
+    np.random.seed(seed)
+    cell_types = adata.obs[cell_type_group].value_counts()
+    if prior_alphas is None:
+        prior_alphas = np.ones(len(cell_types))  # non-informative prior
+    likelihood_alphas = cell_types / len(
+        adata.obs
+    )  # multinomial likelihood (TO CHECK: maths behind average or sum for the likelihood)
+    alpha_posterior = (
+        prior_alphas + likelihood_alphas
+    )  # (TO CHECK: maths behind this simple addition)
+    posterior_dirichlet = np.random.dirichlet(alpha_posterior, n_sample)
+    posterior_dirichlet = np.round(posterior_dirichlet * 1000)
+    posterior_dirichlet = posterior_dirichlet.astype(np.int64)  # number of cells to sample
+    groundtruth_fractions = posterior_dirichlet / posterior_dirichlet.sum(
+        axis=1, keepdims=True
+    )
+
+    random.seed(seed)
+    averaged_data = []
+    for i in range(n_sample):
+        sample_data = []
+        for j, cell_type in enumerate(likelihood_alphas.index):
+            cell_sample = random.sample(
+                list(adata.obs.loc[adata.obs.cell_types_grouped == cell_type].index),
+                posterior_dirichlet[i][j],
+            )
+            sample_data.extend(cell_sample)
+        adata_sample = adata[sample_data]
+        if aggregation_method == "mean":
+            averaged_data.append(adata_sample.layers["relative_counts"].mean(axis=0).tolist()[0])
+        else:
+            averaged_data.append(adata_sample.layers["relative_counts"].sum(axis=0).tolist()[0])
+    averaged_data = pd.DataFrame(
+        averaged_data, index=range(n_sample), columns=adata.var_names
+    )
+
+    # pseudobulk dataset
+    adata_pseudobulk = create_anndata_pseudobulk(adata, averaged_data.values)
+
+    # ground truth fractions
+    groundtruth_fractions = pd.DataFrame(
+        groundtruth_fractions, 
+        index=adata_pseudobulk.obs_names,
+        columns=alpha_posterior.index
+    )
+
     return adata_pseudobulk, groundtruth_fractions
