@@ -23,8 +23,9 @@ from benchmark_utils import (
 from constants import (
     BENCHMARK_DATASET, 
     SIGNATURE_CHOICE, 
-    CELL_TYPE_GROUP, 
+    BENCHMARK_CELL_TYPE_GROUP, 
     BENCHMARK_LOG, 
+    SAVE_MODEL,
     N_CELLS, 
     N_SAMPLES, 
     ONLY_FIT_BASELINE_NNLS,
@@ -41,7 +42,7 @@ if BENCHMARK_DATASET == "TOY":
     # adata = scvi.data.heart_cell_atlas_subsampled()
     # preprocess_scrna(adata, keep_genes=1200, log=BENCHMARK_LOG)
 elif BENCHMARK_DATASET == "CTI":
-    adata = sc.read("/home/owkin/deepdeconv/data/cti_adata.h5ad")
+    adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
                      log=BENCHMARK_LOG,
@@ -60,14 +61,14 @@ elif BENCHMARK_DATASET == "CTI_PROCESSED":
     # adata = sc.read("/home/owkin/cti_data/processed/cti_processed_batch.h5ad")
 
 # %% load signature
-logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {CELL_TYPE_GROUP}...")
+logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {BENCHMARK_CELL_TYPE_GROUP}...")
 signature, intersection = create_signature(
     adata,
     signature_type=SIGNATURE_CHOICE,
 )
 
 # %% add cell types groups and split train/test
-adata, train_test_index = add_cell_types_grouped(adata, CELL_TYPE_GROUP)
+adata, train_test_index = add_cell_types_grouped(adata, BENCHMARK_CELL_TYPE_GROUP)
 adata_train = adata[train_test_index["Train index"]]
 adata_test = adata[train_test_index["Test index"]]
 
@@ -80,7 +81,7 @@ if not ONLY_FIT_BASELINE_NNLS:
     ### %% 1. scVI
     logger.info("Fit scVI ...")
     model_path = f"models/{BENCHMARK_DATASET}_scvi.pkl"
-    scvi_model = fit_scvi(adata_train, model_path)
+    scvi_model = fit_scvi(adata_train, model_path, save_model=SAVE_MODEL)
 
     #### %% 2. DestVI
     # logger.info("Fit DestVI ...")
@@ -98,7 +99,11 @@ if not ONLY_FIT_BASELINE_NNLS:
     #### %% 3. MixupVI
     logger.info("Train mixupVI ...")
     model_path = f"models/{BENCHMARK_DATASET}_mixupvi.pkl"
-    mixupvi_model = fit_mixupvi(adata_train, model_path, cell_type_group=CELL_TYPE_GROUP)
+    mixupvi_model = fit_mixupvi(adata_train, 
+                                model_path, 
+                                cell_type_group=BENCHMARK_CELL_TYPE_GROUP, 
+                                save_model=SAVE_MODEL,
+                                )
 else:
     scvi_model = None
     # destvi_model = None

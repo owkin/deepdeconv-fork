@@ -3,7 +3,7 @@
 
 ## constants for run_mixupvi.py and benchmark_utils/training_utils.py
 # MixUpVI training constants
-MODEL_SAVE = False
+SAVE_MODEL = False
 PATH = "/home/owkin/project/scvi_models/models/cti_linear_test"
 TRAINING_DATASET = "CTI_RAW"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
@@ -34,7 +34,7 @@ elif SIGNATURE_CHOICE == "crosstissue_granular_updated":
     BENCHMARK_CELL_TYPE_GROUP = "updated_granular_groups"
 else:
     pass # no signature was created for the "precise_groups" grouping right now
-BENCHMARK_DATASET = "CTI_RAW"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
 N_CELLS = 2000 # number of cells for creation of pseudobulk and latent pseudobulk
 N_SAMPLES = 300 # number of pseudbulk samples to create and assess for deconvolution

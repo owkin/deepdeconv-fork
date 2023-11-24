@@ -7,8 +7,7 @@ from loguru import logger
 import warnings
 
 from benchmark_utils import (
-    run_categorical_value_checks,
-    run_incompatible_value_checks,
+    fit_mixupvi,
     preprocess_scrna,
     add_cell_types_grouped,
     plot_metrics,
@@ -19,48 +18,11 @@ from benchmark_utils import (
     plot_pearson_random,
 )
 from constants import (
-    MODEL_SAVE,
+    SAVE_MODEL,
     PATH,
     TRAINING_DATASET,
     TRAINING_LOG,
-    MAX_EPOCHS,
-    BATCH_SIZE,
-    TRAIN_SIZE,
     TRAINING_CELL_TYPE_GROUP,
-    CONT_COV,
-    ENCODE_COVARIATES,
-    ENCODE_CONT_COVARIATES,
-    SIGNATURE_TYPE,
-    USE_BATCH_NORM,
-    LOSS_COMPUTATION,
-    PSEUDO_BULK,
-    MIXUP_PENALTY,
-    DISPERSION,
-    GENE_LIKELIHOOD,
-)
-if TRAIN_SIZE == 1:
-    TRAIN_SIZE = 0.9 # to have validation
-
-# Run sanity checks
-run_categorical_value_checks(
-    cell_group=TRAINING_CELL_TYPE_GROUP,
-    cont_cov=CONT_COV,
-    encode_covariates=ENCODE_COVARIATES,
-    encode_cont_covariates=ENCODE_CONT_COVARIATES,
-    use_batch_norm=USE_BATCH_NORM,
-    signature_type=SIGNATURE_TYPE,
-    loss_computation=LOSS_COMPUTATION,
-    pseudo_bulk=PSEUDO_BULK,
-    mixup_penalty=MIXUP_PENALTY,
-    dispersion=DISPERSION,
-    gene_likelihood=GENE_LIKELIHOOD,
-)
-run_incompatible_value_checks(
-    pseudo_bulk=PSEUDO_BULK,
-    loss_computation=LOSS_COMPUTATION,
-    use_batch_norm=USE_BATCH_NORM,
-    mixup_penalty=MIXUP_PENALTY,
-    gene_likelihood=GENE_LIKELIHOOD,
 )
 
 
@@ -90,7 +52,7 @@ elif TRAINING_DATASET == "CTI_PROCESSED":
     # adata = sc.read("/home/owkin/cti_data/processed/cti_processed_batch.h5ad")
 
 
-# %% add cell types groups and split train/test
+# %% Add cell types groups and split train/test
 if TRAINING_DATASET != "TOY":
     adata, train_test_index = add_cell_types_grouped(adata, TRAINING_CELL_TYPE_GROUP)
     adata_train = adata[train_test_index["Train index"]]
@@ -98,37 +60,14 @@ if TRAINING_DATASET != "TOY":
     CAT_COV = ["cell_types_grouped"]
 
 
-# %% Train mixupVI
+# %% Fit MixUpVI with hyperparameters defined in constants.py
 adata_train = adata_train.copy()
-scvi.model.MixUpVI.setup_anndata(
-    adata_train,
-    layer="counts",
-    categorical_covariate_keys=CAT_COV,  # only cell types for now
-    # continuous_covariate_keys=["percent_mito", "percent_ribo"],
+model = fit_mixupvi(
+    adata_train, 
+    model_path=PATH, 
+    cell_type_group="cell_types_grouped", 
+    save_model=SAVE_MODEL
 )
-model = scvi.model.MixUpVI(
-    adata_train,
-    use_batch_norm=USE_BATCH_NORM,
-    signature_type=SIGNATURE_TYPE,
-    loss_computation=LOSS_COMPUTATION,
-    pseudo_bulk=PSEUDO_BULK,
-    encode_covariates=ENCODE_COVARIATES,  # always False for now, because cat covariates is only cell types
-    encode_cont_covariates=ENCODE_CONT_COVARIATES,  # if want to encode continuous covariates
-    mixup_penalty=MIXUP_PENALTY,
-    dispersion=DISPERSION,
-    gene_likelihood=GENE_LIKELIHOOD,
-)
-model.view_anndata_setup()
-model.train(
-    max_epochs=MAX_EPOCHS,
-    batch_size=BATCH_SIZE,
-    train_size=TRAIN_SIZE,
-    check_val_every_n_epoch=1,
-)
-
-## Save model
-if MODEL_SAVE:
-    model.save(PATH)
 
 
 # %%

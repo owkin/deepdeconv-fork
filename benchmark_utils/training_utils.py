@@ -28,7 +28,7 @@ from constants import (
 def fit_mixupvi(adata: ad.AnnData,
                 model_path: str,
                 cell_type_group: str,
-
+                save_model: bool = True,
 ):
     if os.path.exists(model_path):
             logger.info(f"Model fitted, saved in path:{model_path}, loading MixupVI...")
@@ -79,12 +79,14 @@ def fit_mixupvi(adata: ad.AnnData,
                 batch_size=BATCH_SIZE,
                 train_size=TRAIN_SIZE
             )
-            mixupvi_model.save(model_path)
+            if save_model:
+                mixupvi_model.save(model_path)
 
     return mixupvi_model
 
 def fit_scvi(adata: ad.AnnData,
              model_path: str,
+             save_model: bool = True,
              batch_key: Optional[str] = "batch_key"
              ) -> scvi.model.SCVI:
 
@@ -103,7 +105,8 @@ def fit_scvi(adata: ad.AnnData,
             scvi_model = scvi.model.SCVI(adata)
             scvi_model.view_anndata_setup()
             scvi_model.train(max_epochs=MAX_EPOCHS, batch_size=128, train_size=TRAIN_SIZE)
-            scvi_model.save(model_path)
+            if save_model:
+                scvi_model.save(model_path)
 
     return scvi_model
 
