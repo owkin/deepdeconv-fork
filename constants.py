@@ -7,7 +7,7 @@ MODEL_SAVE = False
 PATH = "/home/owkin/project/scvi_models/models/cti_linear_test"
 TRAINING_DATASET = "CTI_RAW"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
-MAX_EPOCHS = 1
+MAX_EPOCHS = 100
 BATCH_SIZE = 1024
 TRAIN_SIZE = 1.0 # as opposed to validation
 # MixUpVI specific constants and constraints

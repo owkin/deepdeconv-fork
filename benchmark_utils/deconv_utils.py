@@ -35,8 +35,13 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
                           adata_latent_signature: ad.AnnData,
                           model: Optional[Union[scvi.model.SCVI, scvi.model.MixUpVI]]):
     """Perform deconvolution in latent space using the nnls method."""
-    with torch.no_grad():
-        latent_pseudobulk = model.get_latent_representation(adata_pseudobulk)
+    # with torch.no_grad():
+    adata_pseudobulk = ad.AnnData(X=adata_pseudobulk.layers["counts"],
+                                  obs=adata_pseudobulk.obs,
+                                  var=adata_pseudobulk.var)
+    adata_pseudobulk.layers["counts"] = adata_pseudobulk.X.copy()
+
+    latent_pseudobulk = model.get_latent_representation(adata_pseudobulk)
     deconv = LinearRegression(positive=True).fit(adata_latent_signature.X.T,
                                                  latent_pseudobulk.T)
     deconv_results = pd.DataFrame(
