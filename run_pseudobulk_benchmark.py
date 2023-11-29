@@ -5,13 +5,24 @@ import scvi
 from loguru import logger
 import warnings
 
+from constants import (
+    BENCHMARK_DATASET,
+    SIGNATURE_CHOICE,
+    BENCHMARK_CELL_TYPE_GROUP,
+    BENCHMARK_LOG,
+    SAVE_MODEL,
+    N_CELLS,
+    N_SAMPLES,
+    ONLY_FIT_BASELINE_NNLS,
+)
+
 from benchmark_utils import (
     preprocess_scrna,
     create_purified_pseudobulk_dataset,
     create_uniform_pseudobulk_dataset,
     create_dirichlet_pseudobulk_dataset,
     fit_scvi,
-    fit_destvi,
+    # fit_destvi,
     fit_mixupvi,
     create_signature,
     add_cell_types_grouped,
@@ -20,17 +31,6 @@ from benchmark_utils import (
     plot_purified_deconv_results,
     plot_deconv_results,
 )
-from constants import (
-    BENCHMARK_DATASET, 
-    SIGNATURE_CHOICE, 
-    BENCHMARK_CELL_TYPE_GROUP, 
-    BENCHMARK_LOG, 
-    SAVE_MODEL,
-    N_CELLS, 
-    N_SAMPLES, 
-    ONLY_FIT_BASELINE_NNLS,
-)
-
 
 # %% Load scRNAseq dataset
 logger.info(f"Loading single-cell dataset: {BENCHMARK_DATASET} ...")
@@ -44,7 +44,7 @@ if BENCHMARK_DATASET == "TOY":
 elif BENCHMARK_DATASET == "CTI":
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     preprocess_scrna(adata,
-                     keep_genes=2500,
+                     keep_genes=3000,
                      log=BENCHMARK_LOG,
                      batch_key="donor_id")
 elif BENCHMARK_DATASET == "CTI_RAW":
@@ -87,7 +87,7 @@ if not ONLY_FIT_BASELINE_NNLS:
     # logger.info("Fit DestVI ...")
     # adata_pseudobulk_train, df_proportions_train = create_uniform_pseudobulk_dataset(
     #     adata_train, n_sample = N_SAMPLES, n_cells = N_CELLS,
-    # )
+    # )w
     # model_path_1 = f"models/{DATASET}_condscvi.pkl"
     # model_path_2 = f"models/{DATASET}_destvi.pkl"
     # condscvi_model , destvi_model= fit_destvi(adata_train,
@@ -98,10 +98,10 @@ if not ONLY_FIT_BASELINE_NNLS:
 
     #### %% 3. MixupVI
     logger.info("Train mixupVI ...")
-    model_path = f"models/{BENCHMARK_DATASET}_mixupvi.pkl"
-    mixupvi_model = fit_mixupvi(adata_train, 
-                                model_path, 
-                                cell_type_group=BENCHMARK_CELL_TYPE_GROUP, 
+    model_path = f"models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi.pkl"
+    mixupvi_model = fit_mixupvi(adata_train,
+                                model_path,
+                                cell_type_group="cell_types_grouped",
                                 save_model=SAVE_MODEL,
                                 )
 else:
@@ -114,11 +114,11 @@ adata_pseudobulk_test = create_purified_pseudobulk_dataset(
     adata_test
 )
 deconv_results = run_purified_sanity_check(
-    adata_train=adata_train, 
-    adata_pseudobulk_test=adata_pseudobulk_test, 
-    signature=signature, 
-    intersection=intersection, 
-    scvi_model=scvi_model, 
+    adata_train=adata_train,
+    adata_pseudobulk_test=adata_pseudobulk_test,
+    signature=signature,
+    intersection=intersection,
+    scvi_model=scvi_model,
     mixupvi_model=mixupvi_model,
     only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
 )
@@ -127,7 +127,7 @@ plot_purified_deconv_results(
     deconv_results,
     only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
     more_details=False,
-    save=False, 
+    save=False,
     filename="test_sanitycheck0"
 )
 
@@ -136,11 +136,11 @@ adata_pseudobulk_test, df_proportions_test = create_uniform_pseudobulk_dataset(
     adata_test, n_sample = N_SAMPLES, n_cells = N_CELLS,
 )
 df_test_correlations, df_test_group_correlations = run_sanity_check(
-    adata_train=adata_train, 
-    adata_pseudobulk_test=adata_pseudobulk_test, 
-    df_proportions_test=df_proportions_test, 
-    signature=signature, 
-    intersection=intersection, 
+    adata_train=adata_train,
+    adata_pseudobulk_test=adata_pseudobulk_test,
+    df_proportions_test=df_proportions_test,
+    signature=signature,
+    intersection=intersection,
     scvi_model=scvi_model,
     mixupvi_model=mixupvi_model,
     only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
@@ -154,11 +154,11 @@ adata_pseudobulk_test, df_proportions_test = create_dirichlet_pseudobulk_dataset
     adata_test, prior_alphas = None, n_sample = N_SAMPLES,
 )
 df_test_correlations, df_test_group_correlations = run_sanity_check(
-    adata_train=adata_train, 
-    adata_pseudobulk_test=adata_pseudobulk_test, 
-    df_proportions_test=df_proportions_test, 
-    signature=signature, 
-    intersection=intersection, 
+    adata_train=adata_train,
+    adata_pseudobulk_test=adata_pseudobulk_test,
+    df_proportions_test=df_proportions_test,
+    signature=signature,
+    intersection=intersection,
     scvi_model=scvi_model,
     mixupvi_model=mixupvi_model,
     only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
