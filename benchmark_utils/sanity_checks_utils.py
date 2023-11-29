@@ -133,14 +133,14 @@ def run_categorical_value_checks(
         raise ValueError(
             "The dispersion parameter can only be part of ['zinb', 'nb', 'poisson']."
         )
-    
+
 
 def run_purified_sanity_check(
-    adata_train, 
-    adata_pseudobulk_test, 
-    signature, 
-    intersection, 
-    scvi_model, 
+    adata_train,
+    adata_pseudobulk_test,
+    signature,
+    intersection,
+    scvi_model,
     mixupvi_model,
     only_fit_baseline_nnls,
 ):
@@ -158,19 +158,19 @@ def run_purified_sanity_check(
     ).rename({"index": "Cell type predicted"}, axis=1)
     if only_fit_baseline_nnls:
         return deconv_results_melted
-    
+
     # create dataframe with different methods
     deconv_results_melted_methods = deconv_results_melted.loc[
         deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
     ].copy()
     deconv_results_melted_methods["Method"] = "NNLS"
-    
+
      ### scVI
     adata_latent_signature = create_latent_signature(
         adata=adata_train,
         model=scvi_model,
         average_all_cells = True,
-        # sc_per_pseudobulk=2000,
+        sc_per_pseudobulk=3000,
     )
     deconv_results = perform_latent_deconv(
         adata_pseudobulk=adata_pseudobulk_test,
@@ -190,14 +190,13 @@ def run_purified_sanity_check(
     deconv_results_melted_methods = pd.concat(
         [deconv_results_melted_methods, deconv_results_melted_methods_temp]
     )
-    
 
     ### MixupVI
     adata_latent_signature = create_latent_signature(
         adata=adata_train,
         model=mixupvi_model,
         average_all_cells = True,
-        # sc_per_pseudobulk=2000,
+        sc_per_pseudobulk=3000,
     )
     deconv_results = perform_latent_deconv(
         adata_pseudobulk=adata_pseudobulk_test,
@@ -238,12 +237,12 @@ def run_purified_sanity_check(
 
 
 def run_sanity_check(
-    adata_train, 
-    adata_pseudobulk_test, 
-    df_proportions_test, 
-    signature, 
-    intersection, 
-    scvi_model, 
+    adata_train,
+    adata_pseudobulk_test,
+    df_proportions_test,
+    signature,
+    intersection,
+    scvi_model,
     mixupvi_model,
     only_fit_baseline_nnls,
 ):
@@ -278,7 +277,7 @@ def run_sanity_check(
         adata=adata_train,
         model=scvi_model,
         average_all_cells = True,
-        # sc_per_pseudobulk=2000,
+        sc_per_pseudobulk=3000,
     )
     deconv_results = perform_latent_deconv(
         adata_pseudobulk=adata_pseudobulk_test,
@@ -295,7 +294,7 @@ def run_sanity_check(
         adata=adata_train,
         model=mixupvi_model,
         average_all_cells = True,
-        # sc_per_pseudobulk=2000,
+        sc_per_pseudobulk=3000,
     )
     deconv_results = perform_latent_deconv(
         adata_pseudobulk=adata_pseudobulk_test,

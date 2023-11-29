@@ -47,7 +47,7 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
     deconv_results = pd.DataFrame(
         deconv.coef_,
         index=adata_pseudobulk.obs_names,
-        columns=adata_latent_signature.obs["cell type"]
+        columns=list(adata_latent_signature.obs["cell type"].values)
     )
     deconv_results = deconv_results.div(
         deconv_results.sum(axis=1), axis=0
@@ -73,7 +73,7 @@ def compute_correlations(deconv_results, ground_truth_fractions):
 
 
 def compute_group_correlations(deconv_results, ground_truth_fractions):
-    """Compute n_groups (here n cell types) pairwise correlations between the 
+    """Compute n_groups (here n cell types) pairwise correlations between the
     deconvolution results and ground truth fractions of the n_samples.
     """
     deconv_results = deconv_results[

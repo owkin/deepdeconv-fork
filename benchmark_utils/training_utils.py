@@ -37,7 +37,6 @@ def fit_mixupvi(adata: ad.AnnData,
             CAT_COV = [cell_type_group]
             run_categorical_value_checks(
                 cell_group=BENCHMARK_CELL_TYPE_GROUP, # cell_type_group,
-                cat_cov=CAT_COV, # for now, only works with cell groups as categorical covariate
                 cont_cov=CONT_COV,
                 encode_covariates=ENCODE_COVARIATES,
                 encode_cont_covariates=ENCODE_CONT_COVARIATES,
