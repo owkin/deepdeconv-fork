@@ -266,7 +266,7 @@ class MixUpVAE(VAE):
         return input_dict
 
     @auto_move_data
-    def _regular_inference(
+    def inference(
         self,
         x,
         batch_index,
