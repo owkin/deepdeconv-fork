@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-
+import pandas as pd
 
 def plot_purified_deconv_results(deconv_results, only_fit_baseline_nnls, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
@@ -14,7 +14,7 @@ def plot_purified_deconv_results(deconv_results, only_fit_baseline_nnls, more_de
         hue = "Method"
     else:
         hue = "Cell type predicted"
-        
+
     plt.clf()
     sns.set_style("whitegrid")
     sns.stripplot(
@@ -49,6 +49,37 @@ def plot_deconv_results(correlations, save=False, filename="test"):
     if save:
         plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
 
+def plot_deconv_results_group(correlations_group, save=False, filename="test_group"):
+    """Plot the deconv correlation results from sanity checks 2 and 3.
+    per cell type.
+    """
+    plt.clf()
+    sns.set_style("whitegrid")
+    df = correlations_group.copy()
+    df["group"] = df.index.to_list()
+    df.set_index('group', inplace=True)
+    # Replace NaN with zeros
+    df = df.fillna(0)
+
+    # Bar plot
+    plt.figure(figsize=(10, 6))
+
+    # Create a long-form DataFrame
+    df_melted = pd.melt(df.reset_index(), id_vars='group', var_name='Model', value_name='Correlation')
+
+    # Create a bar plot using seaborn
+    sns.barplot(x='group', y='Correlation', hue='Model', data=df_melted)
+
+    # Add legend
+    plt.legend()
+
+    # Set plot labels and title
+    plt.xlabel('Cell Type')
+    plt.ylabel('Correlation')
+    plt.title('Bar Plot of Correlations by Cell Type and Model')
+    plt.show()
+    if save:
+        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
 
 def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
     """Plot the train or val metrics from training."""
