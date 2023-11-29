@@ -3,12 +3,12 @@
 
 ## constants for run_mixupvi.py and benchmark_utils/training_utils.py
 # MixUpVI training constants
-SAVE_MODEL = False
+SAVE_MODEL = True
 PATH = "/home/owkin/project/scvi_models/models/cti_linear_test"
-TRAINING_DATASET = "CTI_RAW"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
 MAX_EPOCHS = 100
-BATCH_SIZE = 1024
+BATCH_SIZE = 2048
 TRAIN_SIZE = 1.0 # as opposed to validation
 # MixUpVI specific constants and constraints
 TRAINING_CELL_TYPE_GROUP = (
@@ -25,9 +25,10 @@ MIXUP_PENALTY = "l2"  # ["l2", "kl"]
 DISPERSION = "gene"  # ["gene", "gene_cell"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
 
+BENCHMARK_CELL_TYPE_GROUP = "updated_granular_groups"
 
 ## constants for run_pseudobulk_benchmark.py
-SIGNATURE_CHOICE = "crosstissue_granular_updated"  # ["laughney", "crosstissue_general", "crosstissue_granular_updated"]
+SIGNATURE_CHOICE = "crosstissue_granular_updated" #"crosstissue_granular"  # ["laughney", "crosstissue_general", "crosstissue_granular_updated"]
 if SIGNATURE_CHOICE in ["laughney", "crosstissue_general"]:
     BENCHMARK_CELL_TYPE_GROUP = "primary_groups"
 elif SIGNATURE_CHOICE == "crosstissue_granular_updated":
@@ -37,8 +38,8 @@ else:
 BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
 N_CELLS = 2000 # number of cells for creation of pseudobulk and latent pseudobulk
-N_SAMPLES = 300 # number of pseudbulk samples to create and assess for deconvolution
-ONLY_FIT_BASELINE_NNLS = True # if True, don't fit the deep learning models
+N_SAMPLES = 400 # number of pseudbulk samples to create and assess for deconvolution
+ONLY_FIT_BASELINE_NNLS = False # if True, don't fit the deep learning models
 
 
 # different possibilities of cell groupings with the CTI dataset
