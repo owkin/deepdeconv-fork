@@ -30,6 +30,7 @@ from benchmark_utils import (
     run_sanity_check,
     plot_purified_deconv_results,
     plot_deconv_results,
+    plot_deconv_results_group
 )
 
 # %% Load scRNAseq dataset
@@ -147,7 +148,7 @@ df_test_correlations, df_test_group_correlations = run_sanity_check(
 )
 # Plots
 plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck1")
-plot_deconv_results(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck1")
+plot_deconv_results_group(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck1")
 
 # %% Sanity check 3
 adata_pseudobulk_test, df_proportions_test = create_dirichlet_pseudobulk_dataset(
@@ -165,6 +166,6 @@ df_test_correlations, df_test_group_correlations = run_sanity_check(
 )
 # Plots
 plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck2")
-plot_deconv_results(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck2")
+plot_deconv_results_group(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck2")
 
 # %%
