@@ -49,8 +49,8 @@ starting point for developing and deploying new models with scvi-tools.
 Clone repository
 
 ```
-git clone https://github.com/owkin/deepdeconv # https
-git clone git@github.com:owkin/deepdeconv.git # ssh
+git clone https://github.com/owkin/deepdeconv-fork # https
+git clone git@github.com:owkin/deepdeconv-fork.git # ssh
 ```
 
 Create an environment and install scvi-tools locally
@@ -58,7 +58,7 @@ Create an environment and install scvi-tools locally
 ```
 conda create -n deepdeconv python=3.9
 conda activate deepdeconv
-cd deepdeconv
+cd deepdeconv-fork
 # install library in editable mode
 pip install -e ".[dev,docs,tutorials]"
 # Install additional requirements
