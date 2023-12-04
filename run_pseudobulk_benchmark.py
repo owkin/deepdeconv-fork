@@ -88,7 +88,7 @@ if not ONLY_FIT_BASELINE_NNLS:
     # logger.info("Fit DestVI ...")
     # adata_pseudobulk_train, df_proportions_train = create_uniform_pseudobulk_dataset(
     #     adata_train, n_sample = N_SAMPLES, n_cells = N_CELLS,
-    # )w
+    # )
     # model_path_1 = f"models/{DATASET}_condscvi.pkl"
     # model_path_2 = f"models/{DATASET}_destvi.pkl"
     # condscvi_model , destvi_model= fit_destvi(adata_train,
