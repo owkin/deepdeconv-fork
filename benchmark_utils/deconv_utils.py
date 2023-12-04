@@ -1,6 +1,5 @@
 """Deconvolution benchmark utilities."""
 
-import scanpy as sc
 import anndata as ad
 import pandas as pd
 import numpy as np
