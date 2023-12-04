@@ -25,16 +25,14 @@ MIXUP_PENALTY = "l2"  # ["l2", "kl"]
 DISPERSION = "gene"  # ["gene", "gene_cell"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
 
-BENCHMARK_CELL_TYPE_GROUP = "updated_granular_groups"
-
 ## constants for run_pseudobulk_benchmark.py
-SIGNATURE_CHOICE = "crosstissue_granular_updated" #"crosstissue_granular"  # ["laughney", "crosstissue_general", "crosstissue_granular_updated"]
+SIGNATURE_CHOICE = "crosstissue_granular_updated" # ["laughney", "crosstissue_general", "crosstissue_granular_updated"]
 if SIGNATURE_CHOICE in ["laughney", "crosstissue_general"]:
     BENCHMARK_CELL_TYPE_GROUP = "primary_groups"
 elif SIGNATURE_CHOICE == "crosstissue_granular_updated":
     BENCHMARK_CELL_TYPE_GROUP = "updated_granular_groups"
 else:
-    pass # no signature was created for the "precise_groups" grouping right now
+    BENCHMARK_CELL_TYPE_GROUP = None # no signature was created for the "precise_groups" grouping right now
 BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
 N_CELLS = 2000 # number of cells for creation of pseudobulk and latent pseudobulk

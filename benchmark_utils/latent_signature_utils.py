@@ -12,9 +12,9 @@ from .dataset_utils import create_anndata_pseudobulk
 
 def create_latent_signature(
     adata: ad.AnnData,
-    sc_per_pseudobulk: int,
     repeats: int = 1,
     average_all_cells: bool = True,
+    sc_per_pseudobulk: int = 3000,
     signature_type: str = "pre-encoded",
     cell_type_column: str = "cell_types_grouped",
     count_key: Optional[str] = "counts",
@@ -53,9 +53,11 @@ def create_latent_signature(
         The single cell dataset, with a cell_type_column, and a representation_key in
         the obsm if one wants to aggregate after embedding.
     average_all_cells: bool
-        If True, then average all cells per given cell type.
+        If True, then average all cells per given cell type. sc_per_pseudobulk will
+        not be used.
     sc_per_pseudobulk: int
-        The number of single cells used to construct the purified pseudobulks.
+        The number of single cells used to construct the purified pseudobulks. 
+        Won't be used if average_all_cells = True.
     repeats: int
         The number of representations computed randomly for a given cell type. If 
         average_all_cells is True, all repeats will be the same.
