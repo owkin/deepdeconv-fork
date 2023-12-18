@@ -3,16 +3,19 @@
 
 ## constants for run_mixupvi.py and benchmark_utils/training_utils.py
 # MixUpVI training constants
-SAVE_MODEL = True
-PATH = "/home/owkin/project/scvi_models/models/cti_linear_test"
+TUNE_MIXUPVI = True
+SAVE_MODEL = False
+PATH = "/home/owkin/project/scvi_models/models/test_run"
 TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
 MAX_EPOCHS = 100
 BATCH_SIZE = 2048
-TRAIN_SIZE = 1.0 # as opposed to validation
+TRAIN_SIZE = 0.7 # as opposed to validation
+if TRAIN_SIZE < 1:
+    CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI specific constants and constraints
 TRAINING_CELL_TYPE_GROUP = (
-    "primary_groups"  # ["primary_groups", "precise_groups", "updated_granular_groups"]
+    "updated_granular_groups"  # ["primary_groups", "precise_groups", "updated_granular_groups"]
 )
 CONT_COV = None  # list of continuous covariates to include
 ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar

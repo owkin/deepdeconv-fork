@@ -184,3 +184,27 @@ def plot_pearson_random(model_history, train: bool = True, n_epochs: int = 100):
     plt.legend()
     plt.title(f"{suffix} metrics")
     plt.show()
+
+
+def compare_tuning_results(
+      all_results, variable_to_plot: str, variable_tuned: str, n_epochs: int = 100, hp_index_to_plot: list = None
+):
+    """Plot the train or val losses for a selection of hyperparameters."""
+    all_hp = all_results.hyperparameter.unique()
+    all_hp.sort()
+    if hp_index_to_plot is None:
+        # plot all HPs
+        hp_index_to_plot = range(len(all_hp))
+
+    plt.clf()
+    for i, hp in enumerate(all_hp):
+        if i in hp_index_to_plot:
+            model_history = all_results.loc[all_results.hyperparameter == hp]
+            plt.plot(
+                range(n_epochs),
+                model_history[variable_to_plot],
+                label=f"{variable_tuned}={hp}",
+            )
+    plt.legend()
+    plt.title(variable_to_plot)
+    plt.show()

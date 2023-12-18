@@ -15,7 +15,7 @@ from .dataset_utils import (
     create_dirichlet_pseudobulk_dataset,
 )
 from .latent_signature_utils import create_latent_signature
-from .training_utils import fit_scvi, fit_destvi, fit_mixupvi
+from .training_utils import fit_scvi, fit_destvi, fit_mixupvi, tune_mixupvi
 from .plotting_utils import (
     plot_purified_deconv_results,
     plot_deconv_results,
@@ -26,6 +26,7 @@ from .plotting_utils import (
     plot_reconstruction_loss,
     plot_kl_loss,
     plot_pearson_random,
+    compare_tuning_results,
 )
 from .signature_utils import (
     create_signature,
@@ -37,4 +38,8 @@ from .sanity_checks_utils import (
     run_sanity_check,
     run_categorical_value_checks,
     run_incompatible_value_checks
+)
+from .tuning_utils import(
+    read_tuning_results,
+    read_search_space,
 )

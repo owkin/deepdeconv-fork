@@ -35,6 +35,7 @@ from benchmark_utils import (
 
 # %% Load scRNAseq dataset
 logger.info(f"Loading single-cell dataset: {BENCHMARK_DATASET} ...")
+cell_type = "cell_type_grouped"
 if BENCHMARK_DATASET == "TOY":
     raise NotImplementedError(
         "For now, the toy dataset cannot be used to run the benchmark because no "
@@ -42,6 +43,7 @@ if BENCHMARK_DATASET == "TOY":
     )
     # adata = scvi.data.heart_cell_atlas_subsampled()
     # preprocess_scrna(adata, keep_genes=1200, log=BENCHMARK_LOG)
+    # cell_type = "cell_type"
 elif BENCHMARK_DATASET == "CTI":
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     preprocess_scrna(adata,
@@ -102,7 +104,7 @@ if not ONLY_FIT_BASELINE_NNLS:
     model_path = f"models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi.pkl"
     mixupvi_model = fit_mixupvi(adata_train,
                                 model_path,
-                                cell_type_group="cell_types_grouped",
+                                cell_type_group=cell_type,
                                 save_model=SAVE_MODEL,
                                 )
 else:
