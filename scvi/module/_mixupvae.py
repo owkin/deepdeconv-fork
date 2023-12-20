@@ -152,11 +152,11 @@ class MixUpVAE(VAE):
         extra_encoder_kwargs: Optional[dict] = None,
         extra_decoder_kwargs: Optional[dict] = None,
         # MixUpVAE specific arguments
-        signature_type: str = "pre_encoded",
-        loss_computation: str = "latent_space",
-        pseudo_bulk: str = "pre_encoded",
-        encode_cont_covariates: bool = False,
-        mixup_penalty: str = "l2",
+        signature_type: Tunable[str] = "pre_encoded",
+        loss_computation: Tunable[str] = "latent_space",
+        pseudo_bulk: Tunable[str] = "pre_encoded",
+        encode_cont_covariates: Tunable[bool] = False,
+        mixup_penalty: Tunable[str] = "l2",
     ):
         super().__init__(
             n_input=n_input,

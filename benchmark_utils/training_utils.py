@@ -3,15 +3,20 @@
 from loguru import logger
 import anndata as ad
 import scvi
+import ray
+from scvi import autotune
 import os
 
 from typing import Optional, Tuple
 from .sanity_checks_utils import run_categorical_value_checks, run_incompatible_value_checks
+from .tuning_utils import format_and_save_tuning_results
 
+from tuning_configs import TUNED_VARIABLES
 from constants import (
     MAX_EPOCHS,
     BATCH_SIZE,
     TRAIN_SIZE,
+    CHECK_VAL_EVERY_N_EPOCH,
     BENCHMARK_CELL_TYPE_GROUP,
     CONT_COV,
     ENCODE_COVARIATES,
@@ -24,6 +29,60 @@ from constants import (
     DISPERSION,
     GENE_LIKELIHOOD,
 )
+
+def tune_mixupvi(adata: ad.AnnData,
+                  cell_type_group: str,
+                  search_space: dict,
+                  metric: str,
+                  additional_metrics: list[str],
+                  num_samples: int,
+                  training_dataset: str,
+):
+    CAT_COV = [cell_type_group]
+    run_categorical_value_checks(
+        cell_group=BENCHMARK_CELL_TYPE_GROUP, # cell_type_group,
+        cont_cov=CONT_COV,
+        encode_covariates=ENCODE_COVARIATES,
+        encode_cont_covariates=ENCODE_CONT_COVARIATES,
+        use_batch_norm=USE_BATCH_NORM,
+        signature_type=SIGNATURE_TYPE,
+        loss_computation=LOSS_COMPUTATION,
+        pseudo_bulk=PSEUDO_BULK,
+        mixup_penalty=MIXUP_PENALTY,
+        dispersion=DISPERSION,
+        gene_likelihood=GENE_LIKELIHOOD,
+    )
+    run_incompatible_value_checks(
+        pseudo_bulk=PSEUDO_BULK,
+        loss_computation=LOSS_COMPUTATION,
+        use_batch_norm=USE_BATCH_NORM,
+        mixup_penalty=MIXUP_PENALTY,
+        gene_likelihood=GENE_LIKELIHOOD,
+    )
+    mixupvi_model = scvi.model.MixUpVI
+    mixupvi_model.setup_anndata(
+        adata,
+        layer="counts",
+        categorical_covariate_keys=CAT_COV,  # only cell types for now
+    )
+    scvi_tuner = autotune.ModelTuner(mixupvi_model)
+    # scvi_tuner.info() # to look at all the HP/metrics tunable
+    ray.init(log_to_driver=False)
+    tuning_results = scvi_tuner.fit(
+        adata,
+        metric=metric,
+        additional_metrics=additional_metrics,
+        search_space=search_space,
+        num_samples=num_samples, # will randomly num_samples samples (with replacement) among the HP cominations specified
+        max_epochs=MAX_EPOCHS,
+        resources={"cpu": 10, "gpu": 0.5},
+    )
+
+    all_results, best_hp, tuning_path, search_path = format_and_save_tuning_results(
+        tuning_results, variable=TUNED_VARIABLES[0], training_dataset=training_dataset,
+    )
+
+    return all_results, best_hp, tuning_path, search_path
 
 def fit_mixupvi(adata: ad.AnnData,
                 model_path: str,
@@ -76,7 +135,8 @@ def fit_mixupvi(adata: ad.AnnData,
             mixupvi_model.train(
                 max_epochs=MAX_EPOCHS,
                 batch_size=BATCH_SIZE,
-                train_size=TRAIN_SIZE
+                train_size=TRAIN_SIZE,
+                check_val_every_n_epoch=CHECK_VAL_EVERY_N_EPOCH,
             )
             if save_model:
                 mixupvi_model.save(model_path)

@@ -149,7 +149,26 @@ class TunerManager:
 
         def _get_metrics(model_cls: BaseModelClass) -> OrderedDict:
             # TODO: discover more metrics
-            return {"validation_loss": "min"}
+            return {
+                # val metrics
+                "validation_loss": "min",
+                "mixup_penalty_validation": "min",
+                "reconstruction_loss_validation": "min",
+                "kl_local_validation": "min",
+                "pearson_coeff_validation": "max",
+                "cosine_similarity_validation": "max",
+                "pearson_coeff_deconv_validation": "max",
+                "pearson_coeff_random_validation": "max",
+                # train metrics
+                "train_loss_epoch": "min",
+                "mixup_penalty_train": "min",
+                "reconstruction_loss_train": "min",
+                "kl_local_train": "min",
+                "pearson_coeff_train": "max",
+                "cosine_similarity_train": "max",
+                "pearson_coeff_deconv_train": "max",
+                "pearson_coeff_random_train": "max",
+            }
 
         registry = {
             "tunables": _get_tunables(model_cls),
@@ -410,7 +429,7 @@ class TunerManager:
             _trainable,
             model_cls=self._model_cls,
             adata=adata,
-            metric=list(metrics.keys())[0],
+            metric=list(metrics.keys()),
             setup_method_name=setup_method_name,
             setup_kwargs=setup_kwargs,
             max_epochs=max_epochs,
@@ -483,8 +502,8 @@ class TunerManager:
         )
 
         tune_config = tune.tune_config.TuneConfig(
-            scheduler=_scheduler,
-            search_alg=_searcher,
+            scheduler=None,
+            search_alg=None,
             num_samples=num_samples,
         )
         run_config = air.config.RunConfig(
@@ -511,18 +530,20 @@ class TunerManager:
         search_space = config["search_space"]
         metric, mode = self._get_primary_metric_and_mode(metrics)
 
-        result = results.get_best_result(metric=metric, mode=mode)
-        model_kwargs, train_kwargs = self._get_search_space(result.config)
         metric_values = {}
-        for m in metrics:
-            if m == metric:
-                continue
-            metric_values[m] = result.metrics[m]
+        for metric_i in metrics:
+            result = results.get_best_result(metric=metric_i, mode=metrics[metric_i])
+            if metric_i == metric:
+                # primary metric
+                model_kwargs, train_kwargs = self._get_search_space(result.config)
+                value = result.metrics[metric]
+            else:
+                metric_values[metric_i] = result.metrics[metric_i]
 
         return TuneAnalysis(
             model_kwargs=model_kwargs,
             train_kwargs=train_kwargs,
-            metric={"metric": metric, "mode": mode, "value": result.metrics[metric]},
+            metric={"metric": metric, "mode": mode, "value": value},
             additional_metrics=metric_values,
             search_space=search_space,
             results=results,
