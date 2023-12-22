@@ -180,23 +180,88 @@ def run_purified_sanity_check(
     """
     logger.info("Running sanity check...")
 
-    ### 1. Baselines
+    # 1. Baselines
+    ## NNLS
     if "nnls" in baselines:
         deconv_results = perform_nnls(signature, adata_pseudobulk_test[:, intersection])
-    deconv_results_melted = pd.melt( # melt the matrix for seaborn
-        deconv_results.T.reset_index(),
-        id_vars="index",
-        var_name="Cell type",
-        value_name="Estimated Fraction",
-    ).rename({"index": "Cell type predicted"}, axis=1)
-    if generative_models == {}:
-        return deconv_results_melted
+        deconv_results_melted = pd.melt( # melt the matrix for seaborn
+            deconv_results.T.reset_index(),
+            id_vars="index",
+            var_name="Cell type",
+            value_name="Estimated Fraction",
+        ).rename({"index": "Cell type predicted"}, axis=1)
+    pseudobulk_test_df = pd.DataFrame(
+        adata_pseudobulk_test[:, intersection].X,
+        index=adata_pseudobulk_test.obs_names,
+        columns=intersection,
+    )
+    ## TAPE
+    if "TAPE" in baselines:
+        _, deconv_results = \
+        Deconvolution(signature.T, pseudobulk_test_df,
+                  sep='\t', scaler='mms',
+                  datatype='counts', genelenfile=None,
+                  mode='overall', adaptive=True, variance_threshold=0.98,
+                  save_model_name=None,
+                  batch_size=128, epochs=128, seed=1)
+        deconv_results_melted_methods_tmp = melt_df(deconv_results)
+        deconv_results_melted_methods_tmp["Method"] = model
+        deconv_results_melted_methods = pd.concat(
+            [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
+        )
+    ## Scaden
+    if "Scaden" in baselines:
+        deconv_results = ScadenDeconvolution(signature.T,
+                                            pseudobulk_test_df,
+                                            sep='\t',
+                                            batch_size=128, epochs=128)
+        deconv_results_melted_methods_tmp = melt_df(deconv_results)
+        deconv_results_melted_methods_tmp["Method"] = model
+        deconv_results_melted_methods = pd.concat(
+            [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
+        )
 
     # create dataframe with different methods
     deconv_results_melted_methods = deconv_results_melted.loc[
         deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
     ].copy()
     deconv_results_melted_methods["Method"] = "nnls"
+
+
+    if generative_models == {}:
+        return deconv_results_melted
+
+    ### 2. Generative models
+    for model in generative_models.keys():
+        if model == "DestVI":
+            deconv_results = generative_models[model].get_proportions(adata_pseudobulk_test)
+            deconv_results = deconv_results.drop(["noise_term"],
+                                                 axis=1,
+                                                 inplace=True)
+            deconv_results_melted_methods_tmp = melt_df(deconv_results)
+            deconv_results_melted_methods_tmp["Method"] = model
+            deconv_results_melted_methods = pd.concat(
+                [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
+            )
+            continue
+        else:
+            adata_latent_signature = create_latent_signature(
+                adata=adata_train,
+                model=generative_models[model],
+                average_all_cells = True,
+                sc_per_pseudobulk=3000,
+            )
+            deconv_results = perform_latent_deconv(
+                adata_pseudobulk=adata_pseudobulk_test,
+                adata_latent_signature=adata_latent_signature,
+                model=generative_models[model],
+            )
+            deconv_results_melted_methods_tmp = melt_df(deconv_results)
+            deconv_results_melted_methods_tmp["Method"] = model
+            deconv_results_melted_methods = pd.concat(
+                [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
+            )
+    return deconv_results_melted_methods
 
 
 def run_sanity_check(
