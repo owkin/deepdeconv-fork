@@ -12,6 +12,7 @@ from benchmark_utils import (
     melt_df,
 )
 
+import scvi
 import anndata as ad
 from typing import List, Dict
 from TAPE import Deconvolution
@@ -146,101 +147,56 @@ def run_purified_sanity_check(
     adata_train: ad.AnnData,
     adata_pseudobulk_test: ad.AnnData,
     signature: pd.DataFrame,
-    intersection,
-    scvi_model,
-    mixupvi_model,
-    only_fit_baseline_nnls,
+    intersection: List[str],
+    generative_models : Dict[str, scvi.model],
+    baselines: List[str],
 ):
     """Run sanity check 1 on purified cell types.
-    Possibility to only fit NNLS with only_fit_baseline_nnls==True
-    TODO add other models such as random proportions, destvi, tape..."""
+
+    Sanity check 1 is an "easy" deconvolution task where the pseudobulk test dataset
+    is composed of purified cell types. Thus the groundtruth proportion is 1 for each
+    sample in the dataset.
+
+    If the `generative_models` dictionnary is empty, only the baselines will be run.
+
+    Parameters
+    ----------
+    adata_train: ad.AnnData
+        scRNAseq training dataset.
+    adata_pseudobulk_test: ad.AnnData
+        pseudobulk RNA seq test dataset.
+    signature: pd.DataFrame
+        Signature matrix.
+    intersection: List[str]
+        List of genes in common between the signature and the test dataset.
+    generative_models: Dict[str, scvi.model]
+        Dictionnary of generative models.
+    baselines: List[str]
+        List of baseline methods to run.
+
+    Returns
+        pd.DataFrame
+            Melted dataframe of the deconvolution results.
+    """
     logger.info("Running sanity check...")
-    ### Linear regression (NNLS)
-    deconv_results = perform_nnls(signature, adata_pseudobulk_test[:, intersection])
+
+    ### 1. Baselines
+    if "nnls" in baselines:
+        deconv_results = perform_nnls(signature, adata_pseudobulk_test[:, intersection])
     deconv_results_melted = pd.melt( # melt the matrix for seaborn
         deconv_results.T.reset_index(),
         id_vars="index",
         var_name="Cell type",
         value_name="Estimated Fraction",
     ).rename({"index": "Cell type predicted"}, axis=1)
-    if only_fit_baseline_nnls:
+    if generative_models == {}:
         return deconv_results_melted
 
     # create dataframe with different methods
     deconv_results_melted_methods = deconv_results_melted.loc[
         deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
     ].copy()
-    deconv_results_melted_methods["Method"] = "NNLS"
-
-     ### scVI
-    adata_latent_signature = create_latent_signature(
-        adata=adata_train,
-        model=scvi_model,
-        average_all_cells = True,
-        sc_per_pseudobulk=3000,
-    )
-    deconv_results = perform_latent_deconv(
-        adata_pseudobulk=adata_pseudobulk_test,
-        adata_latent_signature=adata_latent_signature,
-        model=scvi_model,
-    )
-    deconv_results_melted = pd.melt( # melt the matrix for seaborn
-        deconv_results.T.reset_index(),
-        id_vars="index",
-        var_name="Cell type",
-        value_name="Estimated Fraction",
-    ).rename({"index": "Cell type predicted"}, axis=1)
-    deconv_results_melted_methods_temp = deconv_results_melted.loc[
-        deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
-    ].copy()
-    deconv_results_melted_methods_temp["Method"] = "scVI"
-    deconv_results_melted_methods = pd.concat(
-        [deconv_results_melted_methods, deconv_results_melted_methods_temp]
-    )
-
-    ### MixupVI
-    adata_latent_signature = create_latent_signature(
-        adata=adata_train,
-        model=mixupvi_model,
-        average_all_cells = True,
-        sc_per_pseudobulk=3000,
-    )
-    deconv_results = perform_latent_deconv(
-        adata_pseudobulk=adata_pseudobulk_test,
-        adata_latent_signature=adata_latent_signature,
-        model=mixupvi_model
-    )
-    deconv_results_melted = pd.melt( # melt the matrix for seaborn
-        deconv_results.T.reset_index(),
-        id_vars="index",
-        var_name="Cell type",
-        value_name="Estimated Fraction",
-    ).rename({"index": "Cell type predicted"}, axis=1)
-    deconv_results_melted_methods_temp = deconv_results_melted.loc[
-        deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
-    ].copy()
-    deconv_results_melted_methods_temp["Method"] = "MixupVI"
-    deconv_results_melted_methods = pd.concat(
-        [deconv_results_melted_methods, deconv_results_melted_methods_temp]
-    )
-
-    ### TODO DestVI
-    # deconv_results = destvi_model.get_proportions(adata_pseudobulk, deterministic=True)
-    # deconv_results_melted = pd.melt( # melt the matrix for seaborn
-    #     deconv_results.T.reset_index(),
-    #     id_vars="index",
-    #     var_name="Cell type",
-    #     value_name="Estimated Fraction",
-    # ).rename({"index": "Cell type predicted"}, axis=1)
-    # deconv_results_melted_methods_temp = deconv_results_melted.loc[
-    #     deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
-    # ].copy()
-    # deconv_results_melted_methods_temp["Method"] = "DestVI"
-    # deconv_results_melted_methods = pd.concat(
-    #     [deconv_results_melted_methods, deconv_results_melted_methods_temp]
-    # )
-
-    return deconv_results_melted_methods
+    deconv_results_melted_methods["Method"] = "nnls"
 
 
 def run_sanity_check(
