@@ -9,6 +9,7 @@ from benchmark_utils import (
     perform_latent_deconv,
     compute_correlations,
     compute_group_correlations,
+    melt_df,
 )
 
 import anndata as ad
@@ -16,19 +17,6 @@ from typing import List, Dict
 from TAPE import Deconvolution
 from TAPE.deconvolution import ScadenDeconvolution
 
-
-def melt_df(deconv_results):
-    """Melt the deconv results for seaborn"""
-    deconv_results_melted = pd.melt( # melt the matrix for seaborn
-            deconv_results.T.reset_index(),
-            id_vars="index",
-            var_name="Cell type",
-            value_name="Estimated Fraction",
-        ).rename({"index": "Cell type predicted"}, axis=1)
-    deconv_results_melted_methods_temp = deconv_results_melted.loc[
-        deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
-    ].copy()
-    return deconv_results_melted_methods_temp
 
 def run_incompatible_value_checks(
     pseudo_bulk, loss_computation, use_batch_norm, mixup_penalty, gene_likelihood
@@ -155,9 +143,9 @@ def run_categorical_value_checks(
 
 
 def run_purified_sanity_check(
-    adata_train,
-    adata_pseudobulk_test,
-    signature,
+    adata_train: ad.AnnData,
+    adata_pseudobulk_test: ad.AnnData,
+    signature: pd.DataFrame,
     intersection,
     scvi_model,
     mixupvi_model,
