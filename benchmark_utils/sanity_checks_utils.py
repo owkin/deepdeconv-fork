@@ -234,16 +234,18 @@ def run_purified_sanity_check(
     ### 2. Generative models
     for model in generative_models.keys():
         if model == "DestVI":
-            deconv_results = generative_models[model].get_proportions(adata_pseudobulk_test)
-            deconv_results = deconv_results.drop(["noise_term"],
-                                                 axis=1,
-                                                 inplace=True)
-            deconv_results_melted_methods_tmp = melt_df(deconv_results)
-            deconv_results_melted_methods_tmp["Method"] = model
-            deconv_results_melted_methods = pd.concat(
-                [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
-            )
             continue
+            # DestVI is not used for Sanity check 1 - not enough
+            # samples to fit the stLVM.
+            # deconv_results = generative_models[model].get_proportions(adata_pseudobulk_test)
+            # deconv_results = deconv_results.drop(["noise_term"],
+            #                                      axis=1,
+            #                                      inplace=True)
+            # deconv_results_melted_methods_tmp = melt_df(deconv_results)
+            # deconv_results_melted_methods_tmp["Method"] = model
+            # deconv_results_melted_methods = pd.concat(
+            #     [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
+            # )
         else:
             adata_latent_signature = create_latent_signature(
                 adata=adata_train,
