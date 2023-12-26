@@ -7,16 +7,17 @@ import ray
 from scvi import autotune
 import os
 
-from typing import Optional, Tuple
+from typing import Tuple, List
 from .sanity_checks_utils import run_categorical_value_checks, run_incompatible_value_checks
 from .tuning_utils import format_and_save_tuning_results
 
 from tuning_configs import TUNED_VARIABLES
 from constants import (
+    LATENT_SIZE,
     MAX_EPOCHS,
     BATCH_SIZE,
     TRAIN_SIZE,
-    CHECK_VAL_EVERY_N_EPOCH,
+    # CHECK_VAL_EVERY_N_EPOCH,
     BENCHMARK_CELL_TYPE_GROUP,
     CONT_COV,
     ENCODE_COVARIATES,
@@ -121,6 +122,7 @@ def fit_mixupvi(adata: ad.AnnData,
             )
             mixupvi_model = scvi.model.MixUpVI(
                 adata,
+                n_latent=LATENT_SIZE,
                 use_batch_norm=USE_BATCH_NORM,
                 signature_type=SIGNATURE_TYPE,
                 loss_computation=LOSS_COMPUTATION,
@@ -136,7 +138,7 @@ def fit_mixupvi(adata: ad.AnnData,
                 max_epochs=MAX_EPOCHS,
                 batch_size=BATCH_SIZE,
                 train_size=TRAIN_SIZE,
-                check_val_every_n_epoch=CHECK_VAL_EVERY_N_EPOCH,
+                # check_val_every_n_epoch=CHECK_VAL_EVERY_N_EPOCH,
             )
             if save_model:
                 mixupvi_model.save(model_path)
@@ -146,7 +148,7 @@ def fit_mixupvi(adata: ad.AnnData,
 def fit_scvi(adata: ad.AnnData,
              model_path: str,
              save_model: bool = True,
-             batch_key: Optional[str] = "batch_key"
+             batch_key: List[str] = ["donor_id"],
              ) -> scvi.model.SCVI:
 
     """Fit scVI model to single-cell RNA data."""
@@ -157,13 +159,14 @@ def fit_scvi(adata: ad.AnnData,
             scvi.model.SCVI.setup_anndata(
             adata,
             layer="counts",
-            # categorical_covariate_keys=["cell_type"],
-            # batch_index="batch_key", # no other cat covariate for now
-            # continuous_covariate_keys=["percent_mito", "percent_ribo"],
+            categorical_covariate_keys=batch_key
             )
             scvi_model = scvi.model.SCVI(adata)
             scvi_model.view_anndata_setup()
-            scvi_model.train(max_epochs=MAX_EPOCHS, batch_size=128, train_size=TRAIN_SIZE)
+            scvi_model.train(max_epochs=MAX_EPOCHS,
+                             batch_size=128,
+                             train_size=TRAIN_SIZE,
+                            )
             if save_model:
                 scvi_model.save(model_path)
 
@@ -174,6 +177,7 @@ def fit_destvi(adata: ad.AnnData,
               model_path_1: str,
               model_path_2: str,
               cell_type_key: str = "cell_types_grouped",
+              save_model: bool = True,
               ) -> Tuple[scvi.model.CondSCVI, scvi.model.DestVI]:
   """Fit CondSCVI and DestVI model to paired single-cell/pseudoulk datasets."""
   # condscVI
@@ -189,7 +193,8 @@ def fit_destvi(adata: ad.AnnData,
         condscvi_model = scvi.model.CondSCVI(adata, weight_obs=False)
         condscvi_model.view_anndata_setup()
         condscvi_model.train(max_epochs=MAX_EPOCHS, train_size=TRAIN_SIZE)
-        condscvi_model.save(model_path_1)
+        if save_model:
+            condscvi_model.save(model_path_1)
   # DestVI
   if os.path.exists(model_path_2):
         logger.info(f"Model fitted, saved in path:{model_path_2}, loading DestVI...")
@@ -202,6 +207,8 @@ def fit_destvi(adata: ad.AnnData,
         destvi_model = scvi.model.DestVI.from_rna_model(adata_pseudobulk, condscvi_model)
         destvi_model.view_anndata_setup()
         destvi_model.train(max_epochs=MAX_EPOCHS)
+        if save_model:
+            destvi_model.save(model_path_2)
 
   return condscvi_model, destvi_model
 

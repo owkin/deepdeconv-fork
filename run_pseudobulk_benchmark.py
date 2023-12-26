@@ -89,7 +89,10 @@ if not ONLY_FIT_BASELINE_NNLS:
     if "scVI" in GENERATIVE_MODELS:
         logger.info("Fit scVI ...")
         model_path = f"models/{BENCHMARK_DATASET}_scvi.pkl"
-        scvi_model = fit_scvi(adata_train, model_path, save_model=SAVE_MODEL)
+        scvi_model = fit_scvi(adata_train,
+                              model_path,
+                              save_model=SAVE_MODEL,
+                              batch_key=["donor_id", "assay"])
         generative_models["scVI"] = scvi_model
     #### %% 2. DestVI
     if "DestVI" in GENERATIVE_MODELS:
@@ -101,7 +104,8 @@ if not ONLY_FIT_BASELINE_NNLS:
                                                 adata_pseudobulk_train,
                                                 model_path_1,
                                                 model_path_2,
-                                                cell_type_key="cell_types_grouped")
+                                                cell_type_key="cell_types_grouped",
+                                                save_model=SAVE_MODEL)
         generative_models["CondscVI"] = condscvi_model
         generative_models["DestVI"] = destvi_model
 

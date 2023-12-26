@@ -46,7 +46,7 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
                           model: Optional[Union[scvi.model.SCVI,
                                                 scvi.model.MixUpVI,
                                                 scvi.model.CondSCVI]],
-                          use_nnls: bool = True,
+                          use_nnls: bool = False,
                           use_softmax: bool = False) -> pd.DataFrame:
     """Perform deconvolution in latent space using the nnls method.
 
