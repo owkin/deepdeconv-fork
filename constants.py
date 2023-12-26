@@ -41,7 +41,8 @@ BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done fo
 N_CELLS = 2000 # number of cells for creation of pseudobulk and latent pseudobulk
 N_SAMPLES = 400 # number of pseudbulk samples to create and assess for deconvolution
 ONLY_FIT_BASELINE_NNLS = False # if True, don't fit the deep learning models
-
+GENERATIVE_MODELS = ["scVI", "CondscVI", "MixupVI", "DestVI"]
+BASELINES = ["nnls", "TAPE", "Scaden"]
 
 # different possibilities of cell groupings with the CTI dataset
 GROUPS = {
