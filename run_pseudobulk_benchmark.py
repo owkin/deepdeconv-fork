@@ -119,25 +119,25 @@ if not ONLY_FIT_BASELINE_NNLS:
 # %% Sanity check 1
 
 # create *purified* train/test pseudobulk datasets
-adata_pseudobulk_test = create_purified_pseudobulk_dataset(adata_test)
+# adata_pseudobulk_test = create_purified_pseudobulk_dataset(adata_test)
 
-deconv_results = run_purified_sanity_check(
-    adata_train=adata_train,
-    adata_pseudobulk_test=adata_pseudobulk_test,
-    signature=signature,
-    intersection=intersection,
-    generative_models=generative_models,
-    baselines=BASELINES,
-)
+# deconv_results = run_purified_sanity_check(
+#     adata_train=adata_train,
+#     adata_pseudobulk_test=adata_pseudobulk_test,
+#     signature=signature,
+#     intersection=intersection,
+#     generative_models=generative_models,
+#     baselines=BASELINES,
+# )
 
-# %% Plot
-plot_purified_deconv_results(
-    deconv_results,
-    only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
-    more_details=False,
-    save=False,
-    filename="test_sanitycheck_1"
-)
+# # %% Plot
+# plot_purified_deconv_results(
+#     deconv_results,
+#     only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
+#     more_details=False,
+#     save=False,
+#     filename="test_sanitycheck_1"
+# )
 
 # %% Sanity check 2
 

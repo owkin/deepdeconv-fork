@@ -208,6 +208,13 @@ def run_purified_sanity_check(
             value_name="Estimated Fraction",
         ).rename({"index": "Cell type predicted"}, axis=1)
 
+    # create dataframe with different methods
+    deconv_results_melted_methods = deconv_results_melted.loc[
+        deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
+    ].copy()
+    deconv_results_melted_methods["Method"] = "nnls"
+
+    # Pseudobulk Dataframe for TAPE and Scaden
     pseudobulk_test_df = pd.DataFrame(
         adata_pseudobulk_test[:, intersection].X,
         index=adata_pseudobulk_test.obs_names,
@@ -223,7 +230,7 @@ def run_purified_sanity_check(
                   save_model_name=None,
                   batch_size=128, epochs=128, seed=1)
         deconv_results_melted_methods_tmp = melt_df(deconv_results)
-        deconv_results_melted_methods_tmp["Method"] = model
+        deconv_results_melted_methods_tmp["Method"] = "TAPE"
         deconv_results_melted_methods = pd.concat(
             [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
         )
@@ -234,17 +241,10 @@ def run_purified_sanity_check(
                                             sep='\t',
                                             batch_size=128, epochs=128)
         deconv_results_melted_methods_tmp = melt_df(deconv_results)
-        deconv_results_melted_methods_tmp["Method"] = model
+        deconv_results_melted_methods_tmp["Method"] = "Scaden"
         deconv_results_melted_methods = pd.concat(
             [deconv_results_melted_methods, deconv_results_melted_methods_tmp]
         )
-
-    # create dataframe with different methods
-    deconv_results_melted_methods = deconv_results_melted.loc[
-        deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
-    ].copy()
-    deconv_results_melted_methods["Method"] = "nnls"
-
 
     if generative_models == {}:
         return deconv_results_melted
@@ -376,9 +376,9 @@ def run_sanity_check(
     for model in generative_models.keys():
         if model == "DestVI":
             deconv_results = generative_models[model].get_proportions(adata_pseudobulk_test)
-            deconv_results = deconv_results.drop(["noise_term"],
-                                                 axis=1,
-                                                 inplace=True)
+            deconv_results.drop(["noise_term"],
+                            axis=1,
+                            inplace=True)
             deconv_results = deconv_results.loc[:, df_proportions_test.columns]
             correlations = compute_correlations(deconv_results, df_proportions_test)
             group_correlations = compute_group_correlations(deconv_results, df_proportions_test)
