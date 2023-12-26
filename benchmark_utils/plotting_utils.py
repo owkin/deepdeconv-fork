@@ -208,18 +208,3 @@ def compare_tuning_results(
     plt.legend()
     plt.title(variable_to_plot)
     plt.show()
-
-
-# Helper function to create results dataframe
-def melt_df(deconv_results):
-    """Melt the deconv results for seaborn"""
-    deconv_results_melted = pd.melt( # melt the matrix for seaborn
-            deconv_results.T.reset_index(),
-            id_vars="index",
-            var_name="Cell type",
-            value_name="Estimated Fraction",
-        ).rename({"index": "Cell type predicted"}, axis=1)
-    deconv_results_melted_methods_temp = deconv_results_melted.loc[
-        deconv_results_melted["Cell type predicted"] == deconv_results_melted["Cell type"]
-    ].copy()
-    return deconv_results_melted_methods_temp

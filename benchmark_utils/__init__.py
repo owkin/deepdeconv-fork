@@ -27,7 +27,6 @@ from .plotting_utils import (
     plot_kl_loss,
     plot_pearson_random,
     compare_tuning_results,
-    melt_df,
 )
 from .signature_utils import (
     create_signature,
