@@ -1,7 +1,7 @@
 from ray import tune
 
 from constants import (
-    GROUPS, 
+    GROUPS,
     TRAINING_CELL_TYPE_GROUP,
     USE_BATCH_NORM,
     SIGNATURE_TYPE,
@@ -24,17 +24,40 @@ example_search_space = {
     "n_layers": tune.choice([1, 2, 3]),
     "lr": tune.loguniform(1e-4, 1e-2),
 }
+# `n_latent` `
 latent_space_search_space = {
     "n_latent": tune.grid_search(
         list(range(len(GROUPS[TRAINING_CELL_TYPE_GROUP]) - 1, 550, 20)) # from n cell types to n marker genes
     )
 }
-SEARCH_SPACE = latent_space_search_space
+
+# `signature_type`
+signature_type_search_space = {
+    "signature_type": tune.grid_search(["pre_encoded", "post_inference"])
+}
+
+# `pseudo_bulk`
+pseudobulk_search_space = {
+    "pseudo_bulk": tune.grid_search(["pre_encoded", "post_inference"])
+}
+
+# batch size
+batch_size_search_space = {
+    "batch_size": tune.grid_search([256, 512, 1024, 2048, 4096, 8192, 16384])
+}
+
+# gene_likelihood
+gene_likelihood_search_space = {
+    "gene_likelihood": tune.grid_search(["zinb", "nb", "poisson"])
+}
+
+SEARCH_SPACE = gene_likelihood_search_space
+
 TUNED_VARIABLES = list(SEARCH_SPACE.keys())
 NUM_SAMPLES = 1 # will only perform once the gridsearch (useful to change if mix of grid and random search for instance)
 
 
-### add the model and training fixed hyperparameters 
+### add the model and training fixed hyperparameters
 model_fixed_hps = {
     "use_batch_norm": USE_BATCH_NORM,
     "signature_type": SIGNATURE_TYPE,
@@ -48,6 +71,11 @@ model_fixed_hps = {
     "train_size": TRAIN_SIZE,
     "batch_size": BATCH_SIZE,
 }
+
+# Remove tunable hyperparameters from dict of fixed hyperparameters
+key_to_remove = TUNED_VARIABLES[0]
+del model_fixed_hps[key_to_remove]
+
 for key in model_fixed_hps.keys():
     # don't replace the search space by fixed hyperparemeter value
     if key in TUNED_VARIABLES:

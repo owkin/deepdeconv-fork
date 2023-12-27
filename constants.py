@@ -4,13 +4,13 @@
 ## constants for run_mixupvi.py and benchmark_utils/training_utils.py
 # MixUpVI training constants
 TUNE_MIXUPVI = True
-SAVE_MODEL = False
+SAVE_MODEL = True
 PATH = "/home/owkin/project/scvi_models/models/test_run"
 TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
 MAX_EPOCHS = 100
 BATCH_SIZE = 2048
-TRAIN_SIZE = 0.7 # as opposed to validation
+TRAIN_SIZE = 1.0 # as opposed to validation
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI specific constants and constraints
@@ -27,6 +27,7 @@ PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
 MIXUP_PENALTY = "l2"  # ["l2", "kl"]
 DISPERSION = "gene"  # ["gene", "gene_cell"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
+LATENT_SIZE = 25
 
 ## constants for run_pseudobulk_benchmark.py
 SIGNATURE_CHOICE = "crosstissue_granular_updated" # ["laughney", "crosstissue_general", "crosstissue_granular_updated"]
@@ -38,8 +39,8 @@ else:
     BENCHMARK_CELL_TYPE_GROUP = None # no signature was created for the "precise_groups" grouping right now
 BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
-N_CELLS = 2000 # number of cells for creation of pseudobulk and latent pseudobulk
-N_SAMPLES = 400 # number of pseudbulk samples to create and assess for deconvolution
+N_CELLS = 10000 # number of cells for creation of pseudobulk and latent pseudobulk
+N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
 ONLY_FIT_BASELINE_NNLS = False # if True, don't fit the deep learning models
 GENERATIVE_MODELS = ["scVI", "CondscVI", "MixupVI", "DestVI"]
 BASELINES = ["nnls", "TAPE", "Scaden"]
