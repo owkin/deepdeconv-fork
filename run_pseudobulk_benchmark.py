@@ -44,11 +44,13 @@ if BENCHMARK_DATASET == "TOY":
     # adata = scvi.data.heart_cell_atlas_subsampled()
     # preprocess_scrna(adata, keep_genes=1200, log=BENCHMARK_LOG)
 elif BENCHMARK_DATASET == "CTI":
-    adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
-    preprocess_scrna(adata,
-                     keep_genes=3000,
-                     log=BENCHMARK_LOG,
-                     batch_key="donor_id")
+    # Load processed for speed-up (already filtered, normalised, etc.)
+    adata = sc.read("/home/owkin/processed/cti_processed_2500.h5ad")
+    # adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
+    # preprocess_scrna(adata,
+    #                  keep_genes=3000,
+    #                  log=BENCHMARK_LOG,
+    #                  batch_key="donor_id")
 elif BENCHMARK_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
@@ -59,8 +61,7 @@ elif BENCHMARK_DATASET == "CTI_RAW":
                      batch_key="donor_id",
     )
 elif BENCHMARK_DATASET == "CTI_PROCESSED":
-    adata = sc.read("/home/owkin/cti_data/processed/cti_processed.h5ad")
-    # adata = sc.read("/home/owkin/cti_data/processed/cti_processed_batch.h5ad")
+    adata = sc.read("/home/owkin/processed/cti_processed_2500.h5ad")
 
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {BENCHMARK_CELL_TYPE_GROUP}...")
@@ -92,6 +93,7 @@ if not ONLY_FIT_BASELINE_NNLS:
         scvi_model = fit_scvi(adata_train,
                               model_path,
                               save_model=SAVE_MODEL,
+                              # batch effect correction
                               batch_key=["donor_id", "assay"])
         generative_models["scVI"] = scvi_model
     #### %% 2. DestVI
