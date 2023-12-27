@@ -159,7 +159,8 @@ def run_categorical_value_checks(
 
 def run_purified_sanity_check(
     adata_train: ad.AnnData,
-    adata_pseudobulk_test: ad.AnnData,
+    adata_pseudobulk_test_counts: ad.AnnData,
+    adata_pseudobulk_test_rc: ad.AnnData,
     signature: pd.DataFrame,
     intersection: List[str],
     generative_models : Dict[str, Union[scvi.model.SCVI,
@@ -180,8 +181,10 @@ def run_purified_sanity_check(
     ----------
     adata_train: ad.AnnData
         scRNAseq training dataset.
-    adata_pseudobulk_test: ad.AnnData
-        pseudobulk RNA seq test dataset.
+    adata_pseudobulk_test_counts: ad.AnnData
+        pseudobulk RNA seq test dataset (counts).
+    adata_pseudobulk_test_rc: ad.AnnData
+        pseudobulk RNA seq test dataset (relative counts).
     signature: pd.DataFrame
         Signature matrix.
     intersection: List[str]
@@ -200,7 +203,7 @@ def run_purified_sanity_check(
     # 1. Baselines
     ## NNLS
     if "nnls" in baselines:
-        deconv_results = perform_nnls(signature, adata_pseudobulk_test[:, intersection])
+        deconv_results = perform_nnls(signature, adata_pseudobulk_test_rc[:, intersection])
         deconv_results_melted = pd.melt( # melt the matrix for seaborn
             deconv_results.T.reset_index(),
             id_vars="index",
@@ -216,8 +219,8 @@ def run_purified_sanity_check(
 
     # Pseudobulk Dataframe for TAPE and Scaden
     pseudobulk_test_df = pd.DataFrame(
-        adata_pseudobulk_test[:, intersection].X,
-        index=adata_pseudobulk_test.obs_names,
+        adata_pseudobulk_test_rc[:, intersection].X,
+        index=adata_pseudobulk_test_rc.obs_names,
         columns=intersection,
     )
     ## TAPE
@@ -272,7 +275,7 @@ def run_purified_sanity_check(
                 sc_per_pseudobulk=3000,
             )
             deconv_results = perform_latent_deconv(
-                adata_pseudobulk=adata_pseudobulk_test,
+                adata_pseudobulk=adata_pseudobulk_test_counts,
                 adata_latent_signature=adata_latent_signature,
                 model=generative_models[model],
             )
@@ -286,7 +289,8 @@ def run_purified_sanity_check(
 
 def run_sanity_check(
     adata_train: ad.AnnData,
-    adata_pseudobulk_test: ad.AnnData,
+    adata_pseudobulk_test_counts: ad.AnnData,
+    adata_pseudobulk_test_rc: ad.AnnData,
     df_proportions_test: pd.DataFrame,
     signature: pd.DataFrame,
     intersection: List[str],
@@ -305,8 +309,10 @@ def run_sanity_check(
     ----------
     adata_train: ad.AnnData
         scRNAseq training dataset.
-    adata_pseudobulk_test: ad.AnnData
+    adata_pseudobulk_test_counts: ad.AnnData
         pseudobulk RNA seq test dataset.
+    adata_pseudobulk_test_rc: ad.AnnData
+        pseudobulk RNA seq test dataset (relative counts).
     signature: pd.DataFrame
         Signature matrix.
     intersection: List[str]
@@ -324,7 +330,7 @@ def run_sanity_check(
 
     # create dataframe with different methods
     df_test_correlations = pd.DataFrame(
-        index=adata_pseudobulk_test.obs_names,
+        index=adata_pseudobulk_test_counts.obs_names,
         columns=baselines + list(generative_models.keys())
     )
     df_test_group_correlations = pd.DataFrame(
@@ -335,15 +341,15 @@ def run_sanity_check(
     # 1. Linear regression (NNLS)
     if "nnls" in baselines:
         deconv_results = perform_nnls(signature,
-                                      adata_pseudobulk_test[:, intersection])
+                                      adata_pseudobulk_test_rc[:, intersection])
         correlations = compute_correlations(deconv_results, df_proportions_test)
         group_correlations = compute_group_correlations(deconv_results, df_proportions_test)
         df_test_correlations.loc[:, "nnls"] = correlations.values
         df_test_group_correlations.loc[:, "nnls"] = group_correlations.values
 
     pseudobulk_test_df = pd.DataFrame(
-        adata_pseudobulk_test[:, intersection].X,
-        index=adata_pseudobulk_test.obs_names,
+        adata_pseudobulk_test_rc[:, intersection].X,
+        index=adata_pseudobulk_test_rc.obs_names,
         columns=intersection,
     )
     # 2. TAPE
@@ -375,7 +381,7 @@ def run_sanity_check(
     # 4. Generative models
     for model in generative_models.keys():
         if model == "DestVI":
-            deconv_results = generative_models[model].get_proportions(adata_pseudobulk_test)
+            deconv_results = generative_models[model].get_proportions(adata_pseudobulk_test_counts)
             deconv_results.drop(["noise_term"],
                             axis=1,
                             inplace=True)
@@ -392,7 +398,7 @@ def run_sanity_check(
                 sc_per_pseudobulk=3000,
             )
             deconv_results = perform_latent_deconv(
-                adata_pseudobulk=adata_pseudobulk_test,
+                adata_pseudobulk=adata_pseudobulk_test_counts,
                 adata_latent_signature=adata_latent_signature,
                 model=generative_models[model],
             )

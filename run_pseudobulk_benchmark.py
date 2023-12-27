@@ -45,7 +45,7 @@ if BENCHMARK_DATASET == "TOY":
     # preprocess_scrna(adata, keep_genes=1200, log=BENCHMARK_LOG)
 elif BENCHMARK_DATASET == "CTI":
     # Load processed for speed-up (already filtered, normalised, etc.)
-    adata = sc.read("/home/owkin/processed/cti_processed_2500.h5ad")
+    adata = sc.read("/home/owkin/cti_data/processed/cti_processed_2500.h5ad")
     # adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     # preprocess_scrna(adata,
     #                  keep_genes=3000,
@@ -61,7 +61,7 @@ elif BENCHMARK_DATASET == "CTI_RAW":
                      batch_key="donor_id",
     )
 elif BENCHMARK_DATASET == "CTI_PROCESSED":
-    adata = sc.read("/home/owkin/processed/cti_processed_2500.h5ad")
+    adata = sc.read("/home/owkin/cti_data/processed/cti_processed_2500.h5ad")
 
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {BENCHMARK_CELL_TYPE_GROUP}...")
@@ -76,7 +76,7 @@ adata_train = adata[train_test_index["Train index"]]
 adata_test = adata[train_test_index["Test index"]]
 
 # For DestVI
-adata_pseudobulk_train, df_proportions_train = create_uniform_pseudobulk_dataset(
+adata_pseudobulk_train_counts, adata_pseudobulk_train_rc, df_proportions_train = create_uniform_pseudobulk_dataset(
     adata_train, n_sample = N_SAMPLES, n_cells = N_CELLS,
 )
 # %%
@@ -99,11 +99,11 @@ if not ONLY_FIT_BASELINE_NNLS:
     #### %% 2. DestVI
     if "DestVI" in GENERATIVE_MODELS:
         logger.info("Fit DestVI ...")
-
+        # DestVI is only used in sanity check 2
         model_path_1 = f"models/{BENCHMARK_DATASET}_condscvi.pkl"
         model_path_2 = f"models/{BENCHMARK_DATASET}_destvi.pkl"
         condscvi_model , destvi_model= fit_destvi(adata_train,
-                                                adata_pseudobulk_train,
+                                                adata_pseudobulk_train_counts,
                                                 model_path_1,
                                                 model_path_2,
                                                 cell_type_key="cell_types_grouped",
@@ -125,25 +125,26 @@ if not ONLY_FIT_BASELINE_NNLS:
 # %% Sanity check 1
 
 # create *purified* train/test pseudobulk datasets
-# adata_pseudobulk_test = create_purified_pseudobulk_dataset(adata_test)
+adata_pseudobulk_test_counts, adata_pseudobulk_test_rc = create_purified_pseudobulk_dataset(adata_test)
 
-# deconv_results = run_purified_sanity_check(
-#     adata_train=adata_train,
-#     adata_pseudobulk_test=adata_pseudobulk_test,
-#     signature=signature,
-#     intersection=intersection,
-#     generative_models=generative_models,
-#     baselines=BASELINES,
-# )
+deconv_results = run_purified_sanity_check(
+    adata_train=adata_train,
+    adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
+    adata_pseudobulk_test_rc=adata_pseudobulk_test_rc,
+    signature=signature,
+    intersection=intersection,
+    generative_models=generative_models,
+    baselines=BASELINES,
+)
 
 # # %% Plot
-# plot_purified_deconv_results(
-#     deconv_results,
-#     only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
-#     more_details=False,
-#     save=False,
-#     filename="test_sanitycheck_1"
-# )
+plot_purified_deconv_results(
+    deconv_results,
+    only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,
+    more_details=False,
+    save=False,
+    filename="test_sanitycheck_1"
+)
 
 # %% Sanity check 2
 
@@ -157,7 +158,8 @@ adata_pseudobulk_train, df_proportions_train = create_uniform_pseudobulk_dataset
 
 df_test_correlations, df_test_group_correlations = run_sanity_check(
     adata_train=adata_train,
-    adata_pseudobulk_test=adata_pseudobulk_test,
+    adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
+    adata_pseudobulk_test_rc=adata_pseudobulk_test_rc,
     df_proportions_test=df_proportions_test,
     signature=signature,
     intersection=intersection,
@@ -166,22 +168,22 @@ df_test_correlations, df_test_group_correlations = run_sanity_check(
 )
 
 #Plots
-# plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck_2")
-# plot_deconv_results_group(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck_2")
+plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck_2")
+plot_deconv_results_group(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck_2")
 
 # # %% Sanity check 3
-# adata_pseudobulk_test, df_proportions_test = create_dirichlet_pseudobulk_dataset(
+# adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
 #     adata_test, prior_alphas = None, n_sample = N_SAMPLES,
 # )
 # df_test_correlations, df_test_group_correlations = run_sanity_check(
 #     adata_train=adata_train,
-#     adata_pseudobulk_test=adata_pseudobulk_test,
+#     adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
+#     adata_pseudobulk_test_rc=adata_pseudobulk_test_rc
 #     df_proportions_test=df_proportions_test,
 #     signature=signature,
 #     intersection=intersection,
-#     scvi_model=scvi_model,
-#     mixupvi_model=mixupvi_model,
-#     only_fit_baseline_nnls=ONLY_FIT_BASELINE_NNLS,)
+#     generative_models=generative_models,
+#     baselines=BASELINES,
 
 # Plots
 # plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck2")

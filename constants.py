@@ -9,7 +9,7 @@ PATH = "/home/owkin/project/scvi_models/models/test_run"
 TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
 MAX_EPOCHS = 100
-BATCH_SIZE = 2048
+BATCH_SIZE = 4092
 TRAIN_SIZE = 1.0 # as opposed to validation
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
