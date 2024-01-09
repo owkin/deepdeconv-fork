@@ -2,7 +2,7 @@
 library(anndata)
 library(Seurat)
 library(reticulate)
-use_python("/home/owkin/.conda/envs/deepdeconv/bin/python")
+# use_python("/home/owkin/.conda/envs/deepdeconv/bin/python")
 
 library(plyr)
 library(dplyr)
@@ -17,10 +17,10 @@ library(DeconRNASeq)
 library(nnls)
 library(FARDEEP)
 library(MIND)
-source("~/deepdeconv/notebooks/create_signature_matrix/helpers/Signature_function.R")
-source("~/deepdeconv/notebooks/create_signature_matrix/helpers/Deconvolution_function.R")
+source("~/deepdeconv/scripts/create_signature_matrix/helpers/Signature_function.R")
+source("~/deepdeconv/scripts/create_signature_matrix/helpers/Deconvolution_function.R")
 
-dir_out <- "~/project/Simon"
+dir_out <- "~/project/Simon/signature_granular_updated_corrected"
 
 
 # Load data
@@ -33,14 +33,14 @@ raw_X <- t(ad$raw$X)
 rownames(raw_X) <- ad$var_names
 colnames(raw_X) <- ad$obs_names
 
-train_test_cell_types = read.csv("~/project/train_test_index_matrix_granular_updated.csv", row.names = 2)
+train_test_cell_types = read.csv("~/project/train_test_index_matrix_granular_updated.csv", row.names = 1)
 ad$obs$precise_groups_updated <- train_test_cell_types$precise_groups_updated
 ad$obs$train_index <- train_test_cell_types$Train.index
 
 
 # Convert ENSG to HGNC
 
-annot_genes_latestv  <-  "~/deepdeconv/notebooks/create_signature_matrix/helpers/ensdb_hsapiens_v99.tsv" # This one covers everything in the CTI dataset
+annot_genes_latestv  <-  "~/deepdeconv/scripts/create_signature_matrix/helpers/ensdb_hsapiens_v99.tsv" # This one covers everything in the CTI dataset
 annot_ensdb_df <- data.table::fread(annot_genes_latestv)
 cts_annot_df <- data.frame("Ensembl" = rownames(raw_X))  %>% 
 dplyr::left_join(annot_ensdb_df, by = "Ensembl")
@@ -86,8 +86,8 @@ dim(expr_clean)
 
 # Split dataset into 2
 
-trainIndex <- which(expr$train_index == "True")
-scRNseq_t <- expr[,unlist(trainIndex)]
+trainIndex <- which(expr_clean$train_index == "True")
+scRNseq_t <- expr_clean[,unlist(trainIndex)]
 # scRNseq_test <- expr[,-unlist(trainIndex)]
 
 
@@ -107,11 +107,11 @@ if(!file.exists(file.path(dir_out,paste0("DE_",unique(Idents(scRNseq_t))[length(
 
 # Signature matrix
 
-if(!file.exists(file.path(dir_out,"CTI_granular_updated1.txt"))){
+if(!file.exists(file.path(dir_out,"CTI_granular_updated.txt"))){
 
   scRNseq_t <- NormalizeData(object = scRNseq_t, normalization.method = "RC",scale.factor = 10000)
 
-  signature <- buildSignatureMatrix_Seurat("CTI_granular_updated1",
+  signature <- buildSignatureMatrix_Seurat("CTI_granular_updated",
       scRNseq_t,Idents(scRNseq_t),file.path(dir_out),
       pvaladj.cutoff=0.05,diff.cutoff=0.5,
       minG=50,maxG=200)
