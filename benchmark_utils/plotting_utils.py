@@ -3,10 +3,10 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
-def plot_purified_deconv_results(deconv_results, only_fit_baseline_nnls, more_details=False, save=False, filename="test"):
+def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
     if not more_details:
-        if only_fit_baseline_nnls:
+        if only_fit_one_baseline:
             deconv_results = deconv_results.loc[
                 deconv_results["Cell type predicted"] == deconv_results["Cell type"]
             ].copy()
@@ -191,7 +191,8 @@ def compare_tuning_results(
 ):
     """Plot the train or val losses for a selection of hyperparameters."""
     all_hp = all_results.hyperparameter.unique()
-    all_hp.sort()
+    if all_hp.dtype != "0":
+        all_hp.sort()
     if hp_index_to_plot is None:
         # plot all HPs
         hp_index_to_plot = range(len(all_hp))

@@ -36,8 +36,6 @@ from .signature_utils import (
 from .sanity_checks_utils import (
     run_purified_sanity_check,
     run_sanity_check,
-    run_categorical_value_checks,
-    run_incompatible_value_checks
 )
 from .tuning_utils import(
     read_tuning_results,
