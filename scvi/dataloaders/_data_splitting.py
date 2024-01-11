@@ -1,5 +1,7 @@
+import logging
 from math import ceil, floor
 from typing import Dict, List, Optional, Union
+import random
 
 import lightning.pytorch as pl
 import numpy as np
@@ -20,6 +22,7 @@ from scvi.dataloaders._semi_dataloader import SemiSupervisedDataLoader
 from scvi.model._utils import parse_device_args
 from scvi.utils._docstrings import devices_dsp
 
+logger = logging.getLogger(__name__)
 
 def validate_data_split(
     n_samples: int, train_size: float, validation_size: Optional[float] = None
@@ -168,6 +171,144 @@ class DataSplitter(pl.LightningDataModule):
             )
         else:
             pass
+
+
+class MixUpDataSplitter(DataSplitter):
+    """Creates data loaders ``train_set``, ``validation_set``, ``test_set``.
+
+    It makes sure that different cell type proportions are given for every batch, with 
+    the use of a Dirichlet distribution.
+    If ``train_size + validation_set < 1`` then ``test_set`` is non-empty.
+
+    Parameters
+    ----------
+    adata_manager
+        :class:`~scvi.data.AnnDataManager` object that has been created via ``setup_anndata``.
+    train_size
+        float, or None (default is 0.9)
+    validation_size
+        float, or None (default is None)
+    shuffle_set_split
+        Whether to shuffle indices before splitting. If `False`, the val, train, and test set are split in the
+        sequential order of the data according to `validation_size` and `train_size` percentages.
+    pin_memory
+        Whether to copy tensors into device-pinned memory before returning them. Passed
+        into :class:`~scvi.data.AnnDataLoader`.
+    **kwargs
+        Keyword args for data loader. If adata has labeled data, data loader
+        class is :class:`~scvi.dataloaders.SemiSupervisedDataLoader`,
+        else data loader class is :class:`~scvi.dataloaders.AnnDataLoader`.
+
+    Examples
+    --------
+    >>> adata = scvi.data.synthetic_iid()
+    >>> scvi.model.SCVI.setup_anndata(adata)
+    >>> adata_manager = scvi.model.SCVI(adata).adata_manager
+    >>> splitter = DataSplitter(adata)
+    >>> splitter.setup()
+    >>> train_dl = splitter.train_dataloader()
+    """
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+    def setup(
+        self, stage: Optional[str] = None, prior_alphas: np.array = None, reallocate: bool = False,    
+    ):
+        """Split indices in train/test/val sets."""
+        n_train = self.n_train
+        n_val = self.n_val
+        indices = np.arange(self.adata_manager.adata.n_obs)
+
+        random_state = np.random.RandomState(seed=settings.seed) # settings.seed is None so new random state for each run
+        if self.shuffle_set_split:
+            indices = random_state.permutation(indices)
+
+        self.val_idx = indices[:n_val]
+        self.train_idx = indices[n_val : (n_val + n_train)]
+        self.test_idx = indices[(n_val + n_train) :]
+
+        cat_keys = self.adata_manager.registry["setup_args"]["categorical_covariate_keys"]
+        cell_type_key = None
+        for elem in cat_keys:
+            if elem == "cell_type" or elem == "cell_types_grouped":
+                cell_type_key = elem
+
+        if cell_type_key is not None:
+            batch_size = self.data_loader_kwargs["batch_size"]
+            adata_obs = self.adata_manager.adata.obs
+            adata_obs["original_index"] = np.arange(len(self.adata_manager.adata.obs))
+            adata_obs_train = adata_obs.iloc[self.train_idx]
+            cell_types = adata_obs_train[cell_type_key].value_counts()
+
+            # Number of cells to sample according to each cell type will follow a posterior dirichlet distrib
+            if prior_alphas is None:
+                prior_alphas = np.ones(len(cell_types))  # non-informative prior
+            likelihood_alphas = cell_types / n_train  # multinomial likelihood 
+            alpha_posterior = prior_alphas + likelihood_alphas
+            n_batch = int(n_train / batch_size)
+            last_batch = n_train - n_batch * batch_size
+
+            # Sample the proportions with dirichlet
+            posterior_dirichlet = random_state.dirichlet(alpha_posterior, n_batch+1)
+            posterior_dirichlet[:n_batch] = np.round(posterior_dirichlet[:n_batch]*batch_size) # it won't always exactly sum up to batch_size but it's okay
+            posterior_dirichlet[-1] = np.round(posterior_dirichlet[-1]*last_batch)
+            posterior_dirichlet = posterior_dirichlet.astype(np.int64)  # number of cells to sample
+
+            # Sample the cells following the dirichlet proportions.
+            # WARNINGS. Some cells may be shown several times during training between 
+            # batches (and within batches if reallocate is False) and some other won't 
+            # be shown. Rare cell types will be over-represented.
+            # We could also create artificially more batches with this technique.
+            new_training_indices = []
+            max_cells_per_cell_type = adata_obs_train[cell_type_key].value_counts()
+            for i in range(n_batch+1):
+                for j, cell_type in enumerate(likelihood_alphas.index):
+                    replace = False
+                    n_additional_cells_to_sample = 0
+                    if (n_cells_to_sample := posterior_dirichlet[i][j]) > \
+                    (n_cells_max := max_cells_per_cell_type[cell_type]) :
+                        # then not enough cells to sample without replacement in this cell type
+                        if reallocate :
+                            # the additional cells will be sampled in other populations
+                            n_additional_cells_to_sample = n_cells_to_sample - n_cells_max
+                            n_cells_to_sample = n_cells_max
+                        else:
+                            # the cells will just be sampled with replacement
+                            replace = True
+                    indices_cell_sample = random_state.choice(
+                        adata_obs_train.loc[adata_obs_train[cell_type_key] == cell_type, "original_index"].tolist(),
+                        n_cells_to_sample,
+                        replace=replace,
+                    ).tolist()
+                    additional_indices_cell_sample = random_state.choice(
+                        adata_obs_train.loc[adata_obs_train[cell_type_key] != cell_type, "original_index"].tolist(),
+                        n_additional_cells_to_sample,
+                        replace=False,
+                    ).tolist()
+                    new_training_indices.extend(indices_cell_sample+additional_indices_cell_sample)
+            
+            self.train_idx = new_training_indices # new length will be +/- 5 cells different from the original self.train_idx
+
+        else:
+            logger.warn(
+                "No cell type was given for categorical key. The data will be split "
+                "randomly."
+            )
+
+    def train_dataloader(self):
+        """Create train data loader."""
+        return self.data_loader_cls(
+            self.adata_manager,
+            indices=self.train_idx,
+            shuffle=False, # in the original DataSplitter, shuffle=True
+            drop_last=False,
+            pin_memory=self.pin_memory,
+            **self.data_loader_kwargs,
+        )
 
 
 class SemiSupervisedDataSplitter(pl.LightningDataModule):
