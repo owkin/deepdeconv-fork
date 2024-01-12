@@ -22,15 +22,15 @@ def perform_nnls(signature: pd.DataFrame,
     Paramaters
     ----------
     signature: pd.DataFrame
-        Signature matrix of shape (n_features, n_components)
+        Signature matrix of shape (n_genes, n_cell_types)
     adata_pseudobulk: ad.AnnData
-        AnnData object of shape (n_samples, n°)
+        AnnData object of shape (n_samples, n_genes) | relative counts
 
     Returns
     -------
     """
     deconv = LinearRegression(positive=True).fit(
-        signature, adata_pseudobulk.layers["relative_counts"].T
+        signature, adata_pseudobulk.layers["counts"].T
     )
     deconv_results = pd.DataFrame(
         deconv.coef_, index=adata_pseudobulk.obs_names, columns=signature.columns
@@ -53,7 +53,7 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
     Parameters
     ----------
     adata_pseudobulk: ad.AnnData
-        Pseudobulk AnnData object of shape (n_samples, n_genes)
+        Pseudobulk AnnData object of shape (n_samples, n_genes) | counts
     adata_latent_signature: ad.AnnData
         Latent signature AnnData object of shape (n_genes, n_cell_types)
     model:

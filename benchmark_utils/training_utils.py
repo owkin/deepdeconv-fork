@@ -206,7 +206,7 @@ def fit_destvi(adata: ad.AnnData,
             )
         destvi_model = scvi.model.DestVI.from_rna_model(adata_pseudobulk, condscvi_model)
         destvi_model.view_anndata_setup()
-        destvi_model.train(max_epochs=MAX_EPOCHS)
+        destvi_model.train(max_epochs=2500)
         if save_model:
             destvi_model.save(model_path_2)
 

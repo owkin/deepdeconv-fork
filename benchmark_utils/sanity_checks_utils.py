@@ -395,7 +395,7 @@ def run_sanity_check(
                 adata=adata_train,
                 model=generative_models[model],
                 average_all_cells = True,
-                sc_per_pseudobulk=3000,
+                sc_per_pseudobulk=10000,
             )
             deconv_results = perform_latent_deconv(
                 adata_pseudobulk=adata_pseudobulk_test_counts,

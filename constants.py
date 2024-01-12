@@ -20,14 +20,14 @@ TRAINING_CELL_TYPE_GROUP = (
 CONT_COV = None  # list of continuous covariates to include
 ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar
 ENCODE_CONT_COVARIATES = False  # True or False, whether to include cont covar
-SIGNATURE_TYPE = "pre_encoded"  # ["pre_encoded", "post_inference"]
+SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
 PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
 MIXUP_PENALTY = "l2"  # ["l2", "kl"]
 DISPERSION = "gene"  # ["gene", "gene_cell"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
-LATENT_SIZE = 25
+LATENT_SIZE = 30
 
 ## constants for run_pseudobulk_benchmark.py
 SIGNATURE_CHOICE = "crosstissue_granular_updated" # ["laughney", "crosstissue_general", "crosstissue_granular_updated"]
@@ -43,7 +43,7 @@ N_CELLS = 10000 # number of cells for creation of pseudobulk and latent pseudobu
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
 ONLY_FIT_BASELINE_NNLS = False # if True, don't fit the deep learning models
 GENERATIVE_MODELS = ["scVI", "CondscVI", "MixupVI", "DestVI"]
-BASELINES = ["nnls", "TAPE", "Scaden"]
+BASELINES = ["nnls"] #, "TAPE", "Scaden"]
 
 # different possibilities of cell groupings with the CTI dataset
 GROUPS = {
