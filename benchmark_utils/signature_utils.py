@@ -32,7 +32,7 @@ def create_signature(
         )  # it is the normalised one (using adata.X and not adata.raw.X)
     elif signature_type == "crosstissue_granular_updated":
         signature = read_txt_r_signature(
-            "/home/owkin/project/Simon/CTI_granular_updated_ensg.txt"
+            "/home/owkin/project/Simon/signature_granular_updated_corrected/CTI_granular_updated_ensg.txt"
         )
     # intersection between all genes and marker genes
     intersection = list(set(adata.var_names).intersection(signature.index))

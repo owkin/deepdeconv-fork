@@ -4,7 +4,7 @@
 ## constants for run_mixupvi.py and benchmark_utils/training_utils.py
 # MixUpVI training constants
 TUNE_MIXUPVI = True
-SAVE_MODEL = True
+SAVE_MODEL = False
 PATH = "/home/owkin/project/scvi_models/models/test_run"
 TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
@@ -41,9 +41,10 @@ BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
 N_CELLS = 10000 # number of cells for creation of pseudobulk and latent pseudobulk
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
-ONLY_FIT_BASELINE_NNLS = False # if True, don't fit the deep learning models
-GENERATIVE_MODELS = ["scVI", "CondscVI", "MixupVI", "DestVI"]
-BASELINES = ["nnls"] #, "TAPE", "Scaden"]
+GENERATIVE_MODELS = ["scVI", "CondscVI", "MixupVI", "DestVI"] # "scVI", "CondscVI", "MixupVI", "DestVI"
+# GENERATIVE_MODELS = [] # if only want baselines
+BASELINES = ["nnls", "TAPE", "Scaden"] # "nnls", "TAPE", "Scaden"
+# BASELINES = ["nnls"] # if only want nnls
 
 # different possibilities of cell groupings with the CTI dataset
 GROUPS = {
