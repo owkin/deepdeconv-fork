@@ -20,7 +20,9 @@ library(MIND)
 source("~/deepdeconv/scripts/create_signature_matrix/helpers/Signature_function.R")
 source("~/deepdeconv/scripts/create_signature_matrix/helpers/Deconvolution_function.R")
 
-dir_out <- "~/project/Simon/signature_granular_updated_corrected"
+dir_out <- "~/project/Simon/signature_granular_updated_recorrected"
+dir_train_test_indices <- "~/project/train_test_index_matrix_granular_updated.csv"
+name_signature <- "CTI_granular_updated"
 
 
 # Load data
@@ -33,7 +35,7 @@ raw_X <- t(ad$raw$X)
 rownames(raw_X) <- ad$var_names
 colnames(raw_X) <- ad$obs_names
 
-train_test_cell_types = read.csv("~/project/train_test_index_matrix_granular_updated.csv", row.names = 1)
+train_test_cell_types = read.csv(dir_train_test_indices, row.names = 1)
 ad$obs$precise_groups_updated <- train_test_cell_types$precise_groups_updated
 ad$obs$train_index <- train_test_cell_types$Train.index
 
@@ -74,8 +76,9 @@ dim(expr_clean)
 genes.ribomit <- grep(pattern = "^RP[SL][[:digit:]]|^RP[[:digit:]]|^RPSA|^RPS|^RPL|^MT-|^MRPL",rownames(expr_clean))
 expr_clean <- expr_clean[-c(genes.ribomit),]
 dim(expr_clean) 
-# Remove housekeeping genes and patient specific ones: ACTB, if only this one, not a big deal
-genes2remove = grep(pattern = "^ACTB$|TMSB4X|IGKC|^IG[HL]",rownames(expr_clean))
+# Remove housekeeping genes and patient specific ones: ACTB if only this one, not a big deal. 
+# In this context we can remove B2M and HLA-A, B or C. We can also remove H3 histone genes
+genes2remove = grep(pattern = "^ACTB$|TMSB4X|IGKC|^IG[HL]|HLA-[ABC]|B2M|UBC|^H3-|TPT1|ACTG1",rownames(expr_clean))
 expr_clean <- expr_clean[-c(genes2remove),]
 dim(expr_clean)
 # Convert back to ENSG to be in accordance with the CTI data
@@ -107,18 +110,18 @@ if(!file.exists(file.path(dir_out,paste0("DE_",unique(Idents(scRNseq_t))[length(
 
 # Signature matrix
 
-if(!file.exists(file.path(dir_out,"CTI_granular_updated.txt"))){
+if(!file.exists(file.path(dir_out, paste(name_signature,".txt", sep="")))){
 
   scRNseq_t <- NormalizeData(object = scRNseq_t, normalization.method = "RC",scale.factor = 10000)
 
-  signature <- buildSignatureMatrix_Seurat("CTI_granular_updated",
+  signature <- buildSignatureMatrix_Seurat(name_signature,
       scRNseq_t,Idents(scRNseq_t),file.path(dir_out),
       pvaladj.cutoff=0.05,diff.cutoff=0.5,
       minG=50,maxG=200)
-  write.table(signature,file.path(dir_out,"CTI_granular_updated.txt"),sep="\t",row.names=TRUE,col.names=NA)
+  write.table(signature,file.path(dir_out,paste(name_signature,".txt", sep="")),sep="\t",row.names=TRUE,col.names=NA)
   
 }else{
-  signature <- read.table(file.path(dir_out,"CTI_granular_updated.txt"),sep="\t",row.names=1,header=TRUE)
+  signature <- read.table(file.path(dir_out,paste(name_signature,".txt", sep="")),sep="\t",row.names=1,header=TRUE)
 }
 
 
@@ -126,6 +129,6 @@ if(!file.exists(file.path(dir_out,"CTI_granular_updated.txt"))){
 
 signature_ensg <- signature
 rownames(signature_ensg) <- cts_annot_clean_df$Ensembl[match(rownames(signature_ensg), cts_annot_clean_df$HGNC)]
-if(!file.exists(file.path(dir_out,"CTI_granular_updated_ensg.txt"))){
-  write.table(signature_ensg,file.path(dir_out,"CTI_granular_updated_ensg.txt"),sep="\t",row.names=TRUE,col.names=NA)
+if(!file.exists(file.path(dir_out,paste(name_signature,"_ensg.txt", sep="")))){
+  write.table(signature_ensg,file.path(dir_out,paste(name_signature,"_ensg.txt", sep="")),sep="\t",row.names=TRUE,col.names=NA)
 }
