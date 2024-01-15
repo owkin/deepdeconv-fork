@@ -1,6 +1,6 @@
 from typing import List, Optional, Union
 
-from scvi.dataloaders import DataSplitter
+from scvi.dataloaders import DataSplitter, MixUpDataSplitter
 from scvi.model._utils import get_max_epochs_heuristic
 from scvi.train import TrainingPlan, TrainRunner
 from scvi.utils._docstrings import devices_dsp
@@ -9,7 +9,8 @@ from scvi.utils._docstrings import devices_dsp
 class UnsupervisedTrainingMixin:
     """General purpose unsupervised train method."""
 
-    _data_splitter_cls = DataSplitter
+    # _data_splitter_cls = DataSplitter
+    _data_splitter_cls = MixUpDataSplitter
     _training_plan_cls = TrainingPlan
     _train_runner_cls = TrainRunner
 
