@@ -258,7 +258,7 @@ def create_dirichlet_pseudobulk_dataset(
     groundtruth_fractions = pd.DataFrame(
         groundtruth_fractions,
         index=adata_pseudobulk_counts.obs_names,
-        columns=groundtruth_fractions[0].index
+        columns=list(cell_types.index)
     )
     groundtruth_fractions = groundtruth_fractions.fillna(
         0
