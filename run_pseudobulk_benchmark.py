@@ -74,10 +74,6 @@ adata, train_test_index = add_cell_types_grouped(adata, BENCHMARK_CELL_TYPE_GROU
 adata_train = adata[train_test_index["Train index"]]
 adata_test = adata[train_test_index["Test index"]]
 
-# For DestVI
-adata_pseudobulk_train_counts, adata_pseudobulk_train_rc, df_proportions_train = create_uniform_pseudobulk_dataset(
-    adata_train, n_sample = N_SAMPLES, n_cells = N_CELLS,
-)
 # %%
 generative_models = {}
 if GENERATIVE_MODELS != []:
@@ -99,6 +95,10 @@ if GENERATIVE_MODELS != []:
     if "DestVI" in GENERATIVE_MODELS:
         logger.info("Fit DestVI ...")
         # DestVI is only used in sanity check 2
+        adata_pseudobulk_train_counts, adata_pseudobulk_train_rc, df_proportions_train = create_uniform_pseudobulk_dataset(
+            adata_train, n_sample = N_SAMPLES, n_cells = N_CELLS,
+        )
+
         model_path_1 = f"models/{BENCHMARK_DATASET}_condscvi.pkl"
         model_path_2 = f"models/{BENCHMARK_DATASET}_destvi.pkl"
         condscvi_model , destvi_model= fit_destvi(adata_train,
@@ -136,7 +136,7 @@ deconv_results = run_purified_sanity_check(
     baselines=BASELINES,
 )
 
-# # %% Plot
+# # # %% Plot
 plot_purified_deconv_results(
     deconv_results,
     only_fit_one_baseline=False,
@@ -145,7 +145,7 @@ plot_purified_deconv_results(
     filename="test_sanitycheck_1"
 )
 
-# %% Sanity check 2
+# # %% Sanity check 2
 
 # create *uniform* train/test pseudobulk datasets
 adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_uniform_pseudobulk_dataset(
@@ -163,7 +163,7 @@ df_test_correlations, df_test_group_correlations = run_sanity_check(
     baselines=BASELINES,
 )
 
-#Plots
+# #Plots
 plot_deconv_results(df_test_correlations, save=True, filename="test_sanitycheck_2")
 plot_deconv_results_group(df_test_group_correlations, save=True, filename="cell_type_test_sanitycheck_2")
 
@@ -171,6 +171,7 @@ plot_deconv_results_group(df_test_group_correlations, save=True, filename="cell_
 adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
     adata_test, prior_alphas = None, n_sample = N_SAMPLES,
 )
+
 df_test_correlations, df_test_group_correlations = run_sanity_check(
     adata_train=adata_train,
     adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
@@ -183,7 +184,7 @@ df_test_correlations, df_test_group_correlations = run_sanity_check(
 )
 
 # Plots
-plot_deconv_results(df_test_correlations, save=False, filename="test_sanitycheck_3")
-plot_deconv_results_group(df_test_group_correlations, save=False, filename="cell_type_test_sanitycheck_3")
+plot_deconv_results(df_test_correlations, save=True, filename="test_sanitycheck_3")
+plot_deconv_results_group(df_test_group_correlations, save=True, filename="cell_type_test_sanitycheck_3")
 
 # %%
