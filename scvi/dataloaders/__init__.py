@@ -5,6 +5,7 @@ from ._ann_dataloader import AnnDataLoader
 from ._concat_dataloader import ConcatDataLoader
 from ._data_splitting import (
     DataSplitter,
+    MixUpDataSplitter,
     DeviceBackedDataSplitter,
     SemiSupervisedDataSplitter,
 )

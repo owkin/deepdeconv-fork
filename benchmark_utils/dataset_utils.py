@@ -211,17 +211,13 @@ def create_dirichlet_pseudobulk_dataset(
     """
     logger.info("Creating dirichlet pseudobulk dataset...")
     seed = random.randint(0, 1000)
-    np.random.seed(seed)
+    random_state = np.random.RandomState(seed=seed)
     cell_types = adata.obs[cell_type_group].value_counts()
     if prior_alphas is None:
         prior_alphas = np.ones(len(cell_types))  # non-informative prior
-    likelihood_alphas = cell_types / len(
-        adata.obs
-    )  # multinomial likelihood (TO CHECK: maths behind average or sum for the likelihood)
-    alpha_posterior = (
-        prior_alphas + likelihood_alphas
-    )  # (TO CHECK: maths behind this simple addition)
-    posterior_dirichlet = np.random.dirichlet(alpha_posterior, n_sample)
+    likelihood_alphas = cell_types / adata.n_obs  # multinomial likelihood
+    alpha_posterior = prior_alphas + likelihood_alphas
+    posterior_dirichlet = random_state.dirichlet(alpha_posterior, n_sample)
     posterior_dirichlet = np.round(posterior_dirichlet * 1000)
     posterior_dirichlet = posterior_dirichlet.astype(np.int64)  # number of cells to sample
     groundtruth_fractions = posterior_dirichlet / posterior_dirichlet.sum(
