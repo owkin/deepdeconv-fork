@@ -119,7 +119,7 @@ def run_purified_sanity_check(
         )
 
     if generative_models == {}:
-        return deconv_results_melted
+        return deconv_results_melted_methods
 
     ### 2. Generative models
     for model in generative_models.keys():

@@ -10,7 +10,7 @@ TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_LOG = True # whether to log transform the data
 MAX_EPOCHS = 100
 BATCH_SIZE = 4092
-TRAIN_SIZE = 1.0 # as opposed to validation
+TRAIN_SIZE = 0.9 # as opposed to validation
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI specific constants and constraints
@@ -41,10 +41,10 @@ BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
 N_CELLS = 10000 # number of cells for creation of pseudobulk and latent pseudobulk
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
-GENERATIVE_MODELS = ["scVI", "CondscVI", "MixupVI", "DestVI"] # "scVI", "CondscVI", "MixupVI", "DestVI"
+GENERATIVE_MODELS = ["scVI", "MixupVI", "DestVI"] # "scVI", "CondscVI", "MixupVI", "DestVI"
 # GENERATIVE_MODELS = [] # if only want baselines
-BASELINES = ["nnls", "TAPE", "Scaden"] # "nnls", "TAPE", "Scaden"
-# BASELINES = ["nnls"] # if only want nnls
+# BASELINES = ["nnls", "TAPE", "Scaden"] # "nnls", "TAPE", "Scaden"
+BASELINES = ["nnls"] # if only want nnls
 
 # different possibilities of cell groupings with the CTI dataset
 GROUPS = {

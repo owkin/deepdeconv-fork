@@ -14,7 +14,7 @@ from constants import (
     GENE_LIKELIHOOD,
     TRAIN_SIZE,
     BATCH_SIZE,
-    N_LATENT,
+    LATENT_SIZE,
 )
 
 
@@ -82,7 +82,7 @@ model_fixed_hps = {
     "gene_likelihood": GENE_LIKELIHOOD,
     "train_size": TRAIN_SIZE,
     "batch_size": BATCH_SIZE,
-    "n_latent": N_LATENT,
+    "n_latent": LATENT_SIZE,
 }
 for key in list(model_fixed_hps):
     # don't replace the search space by fixed hyperparemeter value

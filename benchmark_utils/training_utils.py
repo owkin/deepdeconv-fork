@@ -14,7 +14,7 @@ from tuning_configs import TUNED_VARIABLES
 from constants import (
     MAX_EPOCHS,
     BATCH_SIZE,
-    N_LATENT,
+    LATENT_SIZE,
     TRAIN_SIZE,
     CHECK_VAL_EVERY_N_EPOCH,
     # BENCHMARK_CELL_TYPE_GROUP,
@@ -83,7 +83,7 @@ def fit_mixupvi(adata: ad.AnnData,
             )
             mixupvi_model = scvi.model.MixUpVI(
                 adata,
-                n_latent=N_LATENT,
+                n_latent=LATENT_SIZE,
                 use_batch_norm=USE_BATCH_NORM,
                 signature_type=SIGNATURE_TYPE,
                 loss_computation=LOSS_COMPUTATION,
