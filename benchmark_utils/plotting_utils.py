@@ -24,7 +24,7 @@ def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_det
     )
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
 
 def plot_deconv_results(correlations, save=False, filename="test"):
@@ -49,7 +49,7 @@ def plot_deconv_results(correlations, save=False, filename="test"):
             )
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
 def plot_deconv_results_group(correlations_group, save=False, filename="test_group"):
     """Plot the deconv correlation results from sanity checks 2 and 3.
@@ -81,30 +81,32 @@ def plot_deconv_results_group(correlations_group, save=False, filename="test_gro
     plt.title('Bar Plot of Correlations by Cell Type and Model')
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
 def plot_deconv_lineplot(results: Dict[int, pd.DataFrame],
                          save=False,
                          filename="sim_pseudobulk_lineplot"):
     for key, df in results.items():
         df = pd.melt(df,
-                    var_name=['method'],
-                    value_name=['pcc']
+                    var_name='method',
+                    value_name='pcc',
         )
         df["n_cells"] = key
+        results[key] = df
     df_results = pd.concat(results.values(), axis=0)
 
     sns.lineplot(data=df_results,
                  x="n_cells",
                  y="pcc",
-                 hue="Method")
+                 hue="method")
+
     plt.title("Pearson correlation coefficient (vs) # sampled cells")
     plt.xlabel('Cell Type')
     plt.ylabel('Correlation')
     plt.show()
 
     if save:
-        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
 
 
