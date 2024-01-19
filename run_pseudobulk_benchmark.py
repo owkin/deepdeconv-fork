@@ -158,7 +158,7 @@ for n in num_cells:
     results_group[n] = df_test_group_correlations
 
 # Plots
-if len(results) == 1:
+if len(results) > 1:
     plot_deconv_lineplot(results,
                         save=True,
                         filename=f"sim_pseudobulk_lineplot.png")
