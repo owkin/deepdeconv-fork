@@ -20,6 +20,7 @@ from .plotting_utils import (
     plot_purified_deconv_results,
     plot_deconv_results,
     plot_deconv_results_group,
+    plot_deconv_lineplot,
     plot_metrics,
     plot_loss,
     plot_mixup_loss,

@@ -3,6 +3,8 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
+from typing import Dict
+
 def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
     if not more_details:
@@ -80,6 +82,33 @@ def plot_deconv_results_group(correlations_group, save=False, filename="test_gro
     plt.show()
     if save:
         plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+
+def plot_deconv_lineplot(results: Dict[int, pd.DataFrame],
+                         save=False,
+                         filename="sim_pseudobulk_lineplot"):
+    for key, df in results.items():
+        df = pd.melt(df,
+                    var_name=['method'],
+                    value_name=['pcc']
+        )
+        df["n_cells"] = key
+    df_results = pd.concat(results.values(), axis=0)
+
+    sns.lineplot(data=df_results,
+                 x="n_cells",
+                 y="pcc",
+                 hue="Method")
+    plt.title("Pearson correlation coefficient (vs) # sampled cells")
+    plt.xlabel('Cell Type')
+    plt.ylabel('Correlation')
+    plt.show()
+
+    if save:
+        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+
+
+
+
 
 def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
     """Plot the train or val metrics from training."""
