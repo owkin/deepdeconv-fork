@@ -201,6 +201,9 @@ def create_dirichlet_pseudobulk_dataset(
     n_sample: int = 300,
     cell_type_group: str = "cell_types_grouped",
     aggregation_method : str = "mean",
+    n_cells : int = 1000,
+    is_n_cells_random : bool = False,
+    add_sparsity : bool = False,
 ):
     """Create pseudobulk dataset from single-cell RNA data, sampled from a dirichlet
     distribution. If a prior belief on the cell fractions (e.g. prior knowledge from
@@ -218,7 +221,11 @@ def create_dirichlet_pseudobulk_dataset(
     likelihood_alphas = cell_types / adata.n_obs  # multinomial likelihood
     alpha_posterior = prior_alphas + likelihood_alphas
     posterior_dirichlet = random_state.dirichlet(alpha_posterior, n_sample)
-    posterior_dirichlet = np.round(posterior_dirichlet * 1000)
+    if is_n_cells_random:
+        n_cells = np.random.randint(50, 1001, size=posterior_dirichlet.shape[0])
+        posterior_dirichlet = np.round(np.multiply(posterior_dirichlet * n_cells))
+    else:
+        posterior_dirichlet = np.round(np.multiply(posterior_dirichlet, n_cells))
     posterior_dirichlet = posterior_dirichlet.astype(np.int64)  # number of cells to sample
     groundtruth_fractions = posterior_dirichlet / posterior_dirichlet.sum(
         axis=1, keepdims=True
@@ -237,10 +244,16 @@ def create_dirichlet_pseudobulk_dataset(
         adata_sample = adata[sample_data]
         if aggregation_method == "mean":
             averaged_data["relative_counts"].append(adata_sample.layers["relative_counts"].mean(axis=0).tolist()[0])
-            averaged_data["counts"].append(adata_sample.layers["counts"].mean(axis=0).tolist()[0])
+            X = adata_sample.layers["counts"].mean(axis=0).tolist()[0]
+            if add_sparsity:
+                X = random_state.binomial(1, 0.2, X.shape) * X
+            averaged_data["counts"].append(X)
         else:
             averaged_data["relative_counts"].append(adata_sample.layers["relative_counts"].sum(axis=0).tolist()[0])
-            averaged_data["counts"].append(adata_sample.layers["counts"].sum(axis=0).tolist()[0])
+            X = adata_sample.layers["counts"].mean(axis=0).tolist()[0]
+            if add_sparsity:
+                X = random_state.binomial(1, 0.2, X.shape) * X
+            averaged_data["counts"].append(X)
 
     # pseudobulk dataset
     adata_pseudobulk_rc = create_anndata_pseudobulk(adata,
@@ -258,6 +271,5 @@ def create_dirichlet_pseudobulk_dataset(
     )
     groundtruth_fractions = groundtruth_fractions.fillna(
         0
-    )  # the Nan are cells not sampled
-
+    )  # The Nan are cells not sampled
     return adata_pseudobulk_counts, adata_pseudobulk_rc, groundtruth_fractions
