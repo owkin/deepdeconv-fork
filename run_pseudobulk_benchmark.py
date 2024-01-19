@@ -129,7 +129,7 @@ if GENERATIVE_MODELS != []:
 
 # # %% Sanity check 3
 
-num_cells = [50, 100, 300, 500, 1000, 2000, 3000, 5000]
+num_cells = [50, 100, 300, 500, 1000] #, 2000, 3000, 5000]
 
 results = {}
 results_group = {}
@@ -141,6 +141,7 @@ for n in num_cells:
         prior_alphas = None,
         n_sample = N_SAMPLES,
         n_cells = N_CELLS,
+        add_sparsity=True
     )
 
     df_test_correlations, df_test_group_correlations = run_sanity_check(

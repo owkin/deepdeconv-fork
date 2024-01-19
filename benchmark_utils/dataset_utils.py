@@ -244,15 +244,15 @@ def create_dirichlet_pseudobulk_dataset(
         adata_sample = adata[sample_data]
         if aggregation_method == "mean":
             averaged_data["relative_counts"].append(adata_sample.layers["relative_counts"].mean(axis=0).tolist()[0])
-            X = adata_sample.layers["counts"].mean(axis=0).tolist()[0]
+            X = np.array(adata_sample.layers["counts"].mean(axis=0).tolist()[0])
             if add_sparsity:
-                X = random_state.binomial(1, 0.2, X.shape) * X
+                X = random_state.binomial(1, 0.2, X.shape[0]) * X
             averaged_data["counts"].append(X)
         else:
             averaged_data["relative_counts"].append(adata_sample.layers["relative_counts"].sum(axis=0).tolist()[0])
-            X = adata_sample.layers["counts"].mean(axis=0).tolist()[0]
+            X = np.array(adata_sample.layers["counts"].mean(axis=0).tolist()[0])
             if add_sparsity:
-                X = random_state.binomial(1, 0.2, X.shape) * X
+                X = random_state.binomial(1, 0.2, X.shape[0]) * X
             averaged_data["counts"].append(X)
 
     # pseudobulk dataset
