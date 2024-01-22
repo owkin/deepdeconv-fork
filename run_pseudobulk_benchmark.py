@@ -140,7 +140,7 @@ for n in num_cells:
         adata_test,
         prior_alphas = None,
         n_sample = N_SAMPLES,
-        n_cells = N_CELLS,
+        n_cells = n,
         add_sparsity=True
     )
 
