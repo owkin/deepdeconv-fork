@@ -3,7 +3,7 @@
 
 ## constants for run_mixupvi.py and benchmark_utils/training_utils.py
 # MixUpVI training constants
-TUNE_MIXUPVI = True
+TUNE_MIXUPVI = False
 SAVE_MODEL = True
 PATH = "/home/owkin/project/scvi_models/models/test_run"
 TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
@@ -11,6 +11,7 @@ TRAINING_LOG = True # whether to log transform the data
 MAX_EPOCHS = 100
 BATCH_SIZE = 1024
 TRAIN_SIZE = 1.0 # as opposed to validation
+BATCH_KEY = "donor_id"
 CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
