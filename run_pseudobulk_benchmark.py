@@ -10,7 +10,6 @@ from constants import (
     BENCHMARK_CELL_TYPE_GROUP,
     BENCHMARK_LOG,
     SAVE_MODEL,
-    N_CELLS,
     N_SAMPLES,
     GENERATIVE_MODELS,
     BASELINES,

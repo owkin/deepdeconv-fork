@@ -12,8 +12,8 @@ MAX_EPOCHS = 100
 BATCH_SIZE = 1024
 TRAIN_SIZE = 1.0 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None
-# if TRAIN_SIZE < 1:
-#     CHECK_VAL_EVERY_N_EPOCH = 1
+if TRAIN_SIZE < 1:
+    CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI specific constants and constraints
 TRAINING_CELL_TYPE_GROUP = (
     "updated_granular_groups"  # ["primary_groups", "precise_groups", "updated_granular_groups"]
@@ -40,7 +40,6 @@ else:
     BENCHMARK_CELL_TYPE_GROUP = None # no signature was created for the "precise_groups" grouping right now
 BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 BENCHMARK_LOG = False # whether to log transform the data - nb it wasn't done for the signature
-N_CELLS = 512 # number of cells for creation of pseudobulk and latent pseudobulk
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
 GENERATIVE_MODELS = ["MixupVI"] #, "DestVI"] # "scVI", "CondscVI", "MixupVI", "DestVI"
 # GENERATIVE_MODELS = [] # if only want baselines
