@@ -69,6 +69,7 @@ def fit_mixupvi(adata: ad.AnnData,
                 model_path: str,
                 cell_type_group: str,
                 save_model: bool = True,
+                batch_key: List[str] = ["donor_id", "assay"],
 ):
     if os.path.exists(model_path):
             logger.info(f"Model fitted, saved in path:{model_path}, loading MixupVI...")
@@ -79,6 +80,7 @@ def fit_mixupvi(adata: ad.AnnData,
             scvi.model.MixUpVI.setup_anndata(
                 adata,
                 layer="counts",
+                batch_key=batch_key,
                 categorical_covariate_keys=CAT_COV,  # only cell types for now
             )
             mixupvi_model = scvi.model.MixUpVI(
@@ -109,13 +111,13 @@ def fit_mixupvi(adata: ad.AnnData,
 def fit_scvi(adata: ad.AnnData,
              model_path: str,
              save_model: bool = True,
-             batch_key: List[str] = ["donor_id"],
+             batch_key: List[str] = ["donor_id", "assay"],
              ) -> scvi.model.SCVI:
 
     """Fit scVI model to single-cell RNA data."""
     if os.path.exists(model_path):
             logger.info(f"Model fitted, saved in path:{model_path}, loading scVI...")
-            scvi_model = scvi.model.SCVI.load(model_path, adata)
+            scvi_model = scvi.mscviodel.SCVI.load(model_path, adata)
     else:
             scvi.model.SCVI.setup_anndata(
             adata,
