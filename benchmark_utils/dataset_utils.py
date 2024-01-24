@@ -12,15 +12,14 @@ from constants import GROUPS
 
 
 def preprocess_scrna(
-    adata: ad.AnnData, keep_genes: int = 2000, log: bool = False, batch_key: Optional[str] = None
+    adata: ad.AnnData, keep_genes: int = 2000, batch_key: Optional[str] = None
 ):
     """Preprocess single-cell RNA data for deconvolution benchmarking."""
     sc.pp.filter_genes(adata, min_counts=3)
-    adata.layers["counts"] = adata.X.copy()  # preserve counts
+    adata.layers["counts"] = adata.X.copy()  # preserve counts, used for training
     sc.pp.normalize_total(adata, target_sum=1e4)
-    if log:
-        sc.pp.log1p(adata)
-    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts
+    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for 
+    sc.pp.log1p(adata)
     adata.raw = adata  # freeze the state in `.raw`
     sc.pp.highly_variable_genes(
         adata,
@@ -223,9 +222,9 @@ def create_dirichlet_pseudobulk_dataset(
     posterior_dirichlet = random_state.dirichlet(alpha_posterior, n_sample)
     if is_n_cells_random:
         n_cells = np.random.randint(50, 1001, size=posterior_dirichlet.shape[0])
-        posterior_dirichlet = np.round(np.multiply(posterior_dirichlet * n_cells))
-    else:
         posterior_dirichlet = np.round(np.multiply(posterior_dirichlet, n_cells))
+    else:
+        posterior_dirichlet = np.round(posterior_dirichlet * n_cells)
     posterior_dirichlet = posterior_dirichlet.astype(np.int64)  # number of cells to sample
     groundtruth_fractions = posterior_dirichlet / posterior_dirichlet.sum(
         axis=1, keepdims=True

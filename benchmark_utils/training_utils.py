@@ -14,6 +14,7 @@ from tuning_configs import TUNED_VARIABLES
 from constants import (
     MAX_EPOCHS,
     BATCH_SIZE,
+    BATCH_KEY,
     LATENT_SIZE,
     TRAIN_SIZE,
     CHECK_VAL_EVERY_N_EPOCH,
@@ -38,7 +39,7 @@ def tune_mixupvi(adata: ad.AnnData,
                   num_samples: int,
                   training_dataset: str,
 ):
-    CAT_COV = [cell_type_group]
+    CAT_COV = [cell_type_group] # + BATCH_KEY # add BATCH_KEY once training for cat cov is fixed
     ## check missing for cell_group = BENCHMARK_CELL_TYPE_GROUP, cont_cov=CONT_COV,
     mixupvi_model = scvi.model.MixUpVI
     mixupvi_model.setup_anndata(
@@ -69,18 +70,17 @@ def fit_mixupvi(adata: ad.AnnData,
                 model_path: str,
                 cell_type_group: str,
                 save_model: bool = True,
-                batch_key: List[str] = ["donor_id", "assay"],
 ):
     if os.path.exists(model_path):
             logger.info(f"Model fitted, saved in path:{model_path}, loading MixupVI...")
             mixupvi_model = scvi.model.MixUpVI.load(model_path, adata)
     else:
-            CAT_COV = [cell_type_group]
+            
+            CAT_COV = [cell_type_group] # + BATCH_KEY # add BATCH_KEY once training for cat cov is fixed
             ## check missing for cell_group = BENCHMARK_CELL_TYPE_GROUP, cont_cov=CONT_COV,
             scvi.model.MixUpVI.setup_anndata(
                 adata,
                 layer="counts",
-                batch_key=batch_key,
                 categorical_covariate_keys=CAT_COV,  # only cell types for now
             )
             mixupvi_model = scvi.model.MixUpVI(
@@ -111,18 +111,17 @@ def fit_mixupvi(adata: ad.AnnData,
 def fit_scvi(adata: ad.AnnData,
              model_path: str,
              save_model: bool = True,
-             batch_key: List[str] = ["donor_id", "assay"],
              ) -> scvi.model.SCVI:
 
     """Fit scVI model to single-cell RNA data."""
     if os.path.exists(model_path):
             logger.info(f"Model fitted, saved in path:{model_path}, loading scVI...")
-            scvi_model = scvi.mscviodel.SCVI.load(model_path, adata)
+            scvi_model = scvi.model.SCVI.load(model_path, adata)
     else:
             scvi.model.SCVI.setup_anndata(
             adata,
             layer="counts",
-            categorical_covariate_keys=batch_key
+            categorical_covariate_keys=BATCH_KEY,
             )
             scvi_model = scvi.model.SCVI(adata)
             scvi_model.view_anndata_setup()

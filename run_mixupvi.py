@@ -24,9 +24,7 @@ from benchmark_utils import (
 from constants import (
     TUNE_MIXUPVI,
     SAVE_MODEL,
-    PATH,
     TRAINING_DATASET,
-    TRAINING_LOG,
     TRAINING_CELL_TYPE_GROUP,
 )
 from tuning_configs import (
@@ -39,13 +37,12 @@ logger.info(f"Loading single-cell dataset: {TRAINING_DATASET} ...")
 cell_type = "cell_types_grouped"
 if TRAINING_DATASET == "TOY":
     adata_train = scvi.data.heart_cell_atlas_subsampled()
-    preprocess_scrna(adata_train, keep_genes=1200, log=TRAINING_LOG)
+    preprocess_scrna(adata_train, keep_genes=1200)
     cell_type = "cell_type"
 elif TRAINING_DATASET == "CTI":
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
-                     log=TRAINING_LOG,
                      batch_key="donor_id")
 elif TRAINING_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
@@ -53,7 +50,6 @@ elif TRAINING_DATASET == "CTI_RAW":
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
-                     log=TRAINING_LOG,
                      batch_key="donor_id",
     )
 elif TRAINING_DATASET == "CTI_PROCESSED":
@@ -83,9 +79,10 @@ if TUNE_MIXUPVI:
     model_history = all_results.loc[all_results.hyperparameter == best_hp] # plots for the best hp found by tuning
     search_space = read_search_space(search_path)
 else:
+    model_path = f"project/models/{TRAINING_DATASET}_{TRAINING_CELL_TYPE_GROUP}_mixupvi.pkl"
     model = fit_mixupvi(
         adata_train,
-        model_path=PATH,
+        model_path=model_path,
         cell_type_group=cell_type,
         save_model=SAVE_MODEL
     )
@@ -101,7 +98,7 @@ else:
 #     model_history = all_results.loc[all_results.hyperparameter == best_hp] # plots for the best hp found by tuning
 # else:
 #     import torch
-#     path = "/home/owkin/project/scvi_models/models/toy_100_epochs"
+#     path = PATH
 #     model = torch.load(f"{path}/model.pt")
 #     model_history = model["attr_dict"]["history_"]
 

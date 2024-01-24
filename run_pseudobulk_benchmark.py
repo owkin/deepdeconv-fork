@@ -8,7 +8,6 @@ from constants import (
     BENCHMARK_DATASET,
     SIGNATURE_CHOICE,
     BENCHMARK_CELL_TYPE_GROUP,
-    BENCHMARK_LOG,
     SAVE_MODEL,
     N_SAMPLES,
     GENERATIVE_MODELS,
@@ -41,21 +40,18 @@ if BENCHMARK_DATASET == "TOY":
         "signature has intersections with its genes, and no train/test split csv exists"
     )
     # adata = scvi.data.heart_cell_atlas_subsampled()
-    # preprocess_scrna(adata, keep_genes=1200, log=BENCHMARK_LOG)
+    # preprocess_scrna(adata, keep_genes=1200)
 elif BENCHMARK_DATASET == "CTI":
-    adata = sc.read("/home/owkin/data/cti_data/processed/cti_processed_3000.h5ad")
-    # adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
-    # preprocess_scrna(adata,
-    #                  keep_genes=3000,
-    #                  log=BENCHMARK_LOG,
-    #                  batch_key="donor_id")
+    adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
+    preprocess_scrna(adata,
+                     keep_genes=2500,
+                     batch_key="donor_id")
 elif BENCHMARK_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
-                     log=BENCHMARK_LOG,
                      batch_key="donor_id",
     )
 elif BENCHMARK_DATASET == "CTI_PROCESSED":
@@ -74,14 +70,12 @@ adata, train_test_index = add_cell_types_grouped(adata, BENCHMARK_CELL_TYPE_GROU
 adata_train = adata[train_test_index["Train index"]]
 adata_test = adata[train_test_index["Test index"]]
 
-# %%
+# %% Create and train generative models
 generative_models = {}
 if GENERATIVE_MODELS != []:
-    # Create and train models
     adata_train = adata_train.copy()
     adata_test = adata_test.copy()
-
-    ### %% 1. scVI
+    # 1. scVI
     if "scVI" in GENERATIVE_MODELS:
         logger.info("Fit scVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_scvi.pkl"
@@ -91,7 +85,7 @@ if GENERATIVE_MODELS != []:
                               # batch effect correction
                               batch_key=["donor_id", "assay"])
         generative_models["scVI"] = scvi_model
-    #### %% 2. DestVI
+    # 2. DestVI
     if "DestVI" in GENERATIVE_MODELS:
         logger.info("Fit DestVI ...")
         # DestVI is only used in sanity check 2
@@ -99,7 +93,7 @@ if GENERATIVE_MODELS != []:
         # adata_pseudobulk_train_counts, adata_pseudobulk_train_rc, df_proportions_train = create_uniform_pseudobulk_dataset(
         #     adata_train, n_sample = N_SAMPLES, n_cells = N_CELLS,
         # )
-        # Dirrichlet
+        # Dirichlet
         adata_pseudobulk_train_counts, adata_pseudobulk_train_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
             adata_train, prior_alphas = None, n_sample = N_SAMPLES,
         )
@@ -115,7 +109,7 @@ if GENERATIVE_MODELS != []:
         # generative_models["CondscVI"] = condscvi_model
         generative_models["DestVI"] = destvi_model
 
-    #### %% 3. MixupVI
+    # 3. MixupVI
     if "MixupVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi.pkl"
@@ -126,7 +120,7 @@ if GENERATIVE_MODELS != []:
                                     )
         generative_models["MixupVI"] = mixupvi_model
 
-# # %% Sanity check 3
+# %% Sanity check 3
 
 num_cells = [50, 100, 300, 500, 1000] #, 2000, 3000, 5000]
 
@@ -142,6 +136,12 @@ for n in num_cells:
         n_cells = n,
         add_sparsity=True
     )
+    # decomment following for Sanity check 2.
+    # adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_uniform_pseudobulk_dataset(
+    #     adata_test,
+    #     n_sample = N_SAMPLES,
+    #     n_cells = n,
+    # )
 
     df_test_correlations, df_test_group_correlations = run_sanity_check(
         adata_train=adata_train,
@@ -157,7 +157,7 @@ for n in num_cells:
     results[n] = df_test_correlations
     results_group[n] = df_test_group_correlations
 
-# Plots
+# %% Plots
 if len(results) > 1:
     plot_deconv_lineplot(results,
                         save=True,
