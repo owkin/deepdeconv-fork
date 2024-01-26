@@ -8,7 +8,6 @@ from constants import (
     LOSS_COMPUTATION,
     PSEUDO_BULK,
     ENCODE_COVARIATES,
-    ENCODE_CONT_COVARIATES,
     MIXUP_PENALTY,
     DISPERSION,
     GENE_LIKELIHOOD,
@@ -76,13 +75,13 @@ model_fixed_hps = {
     "loss_computation": LOSS_COMPUTATION,
     "pseudo_bulk": PSEUDO_BULK,
     "encode_covariates": ENCODE_COVARIATES,
-    "encode_cont_covariates": ENCODE_CONT_COVARIATES,
     "mixup_penalty": MIXUP_PENALTY,
     "dispersion": DISPERSION,
     "gene_likelihood": GENE_LIKELIHOOD,
     "train_size": TRAIN_SIZE,
     "batch_size": BATCH_SIZE,
     "n_latent": LATENT_SIZE,
+    "n_cell_types": len(GROUPS[TRAINING_CELL_TYPE_GROUP]) - 1,
 }
 for key in list(model_fixed_hps):
     # don't replace the search space by fixed hyperparemeter value

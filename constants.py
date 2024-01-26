@@ -27,15 +27,14 @@ SAVE_MODEL = False
 # MixUpVI training hyperparameters
 MAX_EPOCHS = 100
 BATCH_SIZE = 1024
-BATCH_KEY = ["donor_id", "assay"] # needs to be of type list
 TRAIN_SIZE = 0.7 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI model hyperparameters
 CONT_COV = None  # list of continuous covariates to include
-ENCODE_COVARIATES = False  # should be always False for now, we don't encode cat covar
-ENCODE_CONT_COVARIATES = False  # True or False, whether to include cont covar
+CAT_COV = ["donor_id", "assay"] # list of categorical covariates to include
+ENCODE_COVARIATES = True # whether to encode cont/cat covars (they are always decoded)
 SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]

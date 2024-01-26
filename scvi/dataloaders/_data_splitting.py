@@ -231,11 +231,10 @@ class MixUpDataSplitter(DataSplitter):
         self.train_idx = indices[n_val : (n_val + n_train)]
         self.test_idx = indices[(n_val + n_train) :]
 
-        cat_keys = self.adata_manager.registry["setup_args"]["categorical_covariate_keys"]
         cell_type_key = None
-        for elem in cat_keys:
-            if elem == "cell_type" or elem == "cell_types_grouped":
-                cell_type_key = elem
+        if (labels_key := self.adata_manager.registry["setup_args"]["labels_key"]) == \
+            "cell_type" or labels_key == "cell_types_grouped":
+            cell_type_key = labels_key
 
         if cell_type_key is not None:
             batch_size = self.data_loader_kwargs["batch_size"]
