@@ -15,7 +15,12 @@ from scvi.module.base import LossOutput, auto_move_data
 from scvi.nn import one_hot
 from scvi.nn import Encoder
 from ._vae import VAE
-from ._utils import create_random_proportion, get_pearsonr_torch
+from ._utils import (
+    run_categorical_value_checks, 
+    run_incompatible_value_checks, 
+    create_random_proportion, 
+    get_pearsonr_torch
+)
 
 # for deconvolution
 from scipy.optimize import nnls
@@ -184,6 +189,26 @@ class MixUpVAE(VAE):
             extra_encoder_kwargs=extra_encoder_kwargs,
             extra_decoder_kwargs=extra_decoder_kwargs,
         )
+        run_categorical_value_checks(
+            encode_covariates=encode_covariates,
+            encode_cont_covariates=encode_cont_covariates,
+            use_batch_norm=use_batch_norm,
+            signature_type=signature_type,
+            loss_computation=loss_computation,
+            pseudo_bulk=pseudo_bulk,
+            mixup_penalty=mixup_penalty,
+            dispersion=dispersion,
+            gene_likelihood=gene_likelihood,
+        )
+        run_incompatible_value_checks(
+            pseudo_bulk=pseudo_bulk,
+            loss_computation=loss_computation,
+            use_batch_norm=use_batch_norm,
+            mixup_penalty=mixup_penalty,
+            gene_likelihood=gene_likelihood,
+        )
+
+
         self.signature_type = signature_type
         self.loss_computation = loss_computation
         self.pseudo_bulk = pseudo_bulk

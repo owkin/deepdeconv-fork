@@ -3,10 +3,12 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
-def plot_purified_deconv_results(deconv_results, only_fit_baseline_nnls, more_details=False, save=False, filename="test"):
+from typing import Dict
+
+def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
     if not more_details:
-        if only_fit_baseline_nnls:
+        if only_fit_one_baseline:
             deconv_results = deconv_results.loc[
                 deconv_results["Cell type predicted"] == deconv_results["Cell type"]
             ].copy()
@@ -22,7 +24,7 @@ def plot_purified_deconv_results(deconv_results, only_fit_baseline_nnls, more_de
     )
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
 
 def plot_deconv_results(correlations, save=False, filename="test"):
@@ -47,7 +49,7 @@ def plot_deconv_results(correlations, save=False, filename="test"):
             )
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
 def plot_deconv_results_group(correlations_group, save=False, filename="test_group"):
     """Plot the deconv correlation results from sanity checks 2 and 3.
@@ -79,7 +81,36 @@ def plot_deconv_results_group(correlations_group, save=False, filename="test_gro
     plt.title('Bar Plot of Correlations by Cell Type and Model')
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/sanity_checks/{filename}.png", dpi=300)
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+
+def plot_deconv_lineplot(results: Dict[int, pd.DataFrame],
+                         save=False,
+                         filename="sim_pseudobulk_lineplot"):
+    for key, df in results.items():
+        df = pd.melt(df,
+                    var_name='method',
+                    value_name='pcc',
+        )
+        df["n_cells"] = key
+        results[key] = df
+    df_results = pd.concat(results.values(), axis=0)
+
+    sns.lineplot(data=df_results,
+                 x="n_cells",
+                 y="pcc",
+                 hue="method")
+
+    plt.title("Pearson correlation coefficient (vs) # sampled cells")
+    plt.xlabel('Cell Type')
+    plt.ylabel('Correlation')
+    plt.show()
+
+    if save:
+        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+
+
+
+
 
 def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
     """Plot the train or val metrics from training."""
@@ -191,7 +222,8 @@ def compare_tuning_results(
 ):
     """Plot the train or val losses for a selection of hyperparameters."""
     all_hp = all_results.hyperparameter.unique()
-    all_hp.sort()
+    if all_hp.dtype != "0":
+        all_hp.sort()
     if hp_index_to_plot is None:
         # plot all HPs
         hp_index_to_plot = range(len(all_hp))

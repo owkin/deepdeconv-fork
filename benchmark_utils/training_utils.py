@@ -7,18 +7,19 @@ import ray
 from scvi import autotune
 import os
 
-from typing import Optional, Tuple
-from .sanity_checks_utils import run_categorical_value_checks, run_incompatible_value_checks
+from typing import Tuple, List
 from .tuning_utils import format_and_save_tuning_results
 
 from tuning_configs import TUNED_VARIABLES
 from constants import (
     MAX_EPOCHS,
     BATCH_SIZE,
+    BATCH_KEY,
+    LATENT_SIZE,
     TRAIN_SIZE,
     CHECK_VAL_EVERY_N_EPOCH,
-    BENCHMARK_CELL_TYPE_GROUP,
-    CONT_COV,
+    # BENCHMARK_CELL_TYPE_GROUP,
+    # CONT_COV,
     ENCODE_COVARIATES,
     ENCODE_CONT_COVARIATES,
     SIGNATURE_TYPE,
@@ -38,27 +39,8 @@ def tune_mixupvi(adata: ad.AnnData,
                   num_samples: int,
                   training_dataset: str,
 ):
-    CAT_COV = [cell_type_group]
-    run_categorical_value_checks(
-        cell_group=BENCHMARK_CELL_TYPE_GROUP, # cell_type_group,
-        cont_cov=CONT_COV,
-        encode_covariates=ENCODE_COVARIATES,
-        encode_cont_covariates=ENCODE_CONT_COVARIATES,
-        use_batch_norm=USE_BATCH_NORM,
-        signature_type=SIGNATURE_TYPE,
-        loss_computation=LOSS_COMPUTATION,
-        pseudo_bulk=PSEUDO_BULK,
-        mixup_penalty=MIXUP_PENALTY,
-        dispersion=DISPERSION,
-        gene_likelihood=GENE_LIKELIHOOD,
-    )
-    run_incompatible_value_checks(
-        pseudo_bulk=PSEUDO_BULK,
-        loss_computation=LOSS_COMPUTATION,
-        use_batch_norm=USE_BATCH_NORM,
-        mixup_penalty=MIXUP_PENALTY,
-        gene_likelihood=GENE_LIKELIHOOD,
-    )
+    CAT_COV = [cell_type_group] # + BATCH_KEY # add BATCH_KEY once training for cat cov is fixed
+    ## check missing for cell_group = BENCHMARK_CELL_TYPE_GROUP, cont_cov=CONT_COV,
     mixupvi_model = scvi.model.MixUpVI
     mixupvi_model.setup_anndata(
         adata,
@@ -93,27 +75,9 @@ def fit_mixupvi(adata: ad.AnnData,
             logger.info(f"Model fitted, saved in path:{model_path}, loading MixupVI...")
             mixupvi_model = scvi.model.MixUpVI.load(model_path, adata)
     else:
-            CAT_COV = [cell_type_group]
-            run_categorical_value_checks(
-                cell_group=BENCHMARK_CELL_TYPE_GROUP, # cell_type_group,
-                cont_cov=CONT_COV,
-                encode_covariates=ENCODE_COVARIATES,
-                encode_cont_covariates=ENCODE_CONT_COVARIATES,
-                use_batch_norm=USE_BATCH_NORM,
-                signature_type=SIGNATURE_TYPE,
-                loss_computation=LOSS_COMPUTATION,
-                pseudo_bulk=PSEUDO_BULK,
-                mixup_penalty=MIXUP_PENALTY,
-                dispersion=DISPERSION,
-                gene_likelihood=GENE_LIKELIHOOD,
-            )
-            run_incompatible_value_checks(
-                pseudo_bulk=PSEUDO_BULK,
-                loss_computation=LOSS_COMPUTATION,
-                use_batch_norm=USE_BATCH_NORM,
-                mixup_penalty=MIXUP_PENALTY,
-                gene_likelihood=GENE_LIKELIHOOD,
-            )
+            
+            CAT_COV = [cell_type_group] # + BATCH_KEY # add BATCH_KEY once training for cat cov is fixed
+            ## check missing for cell_group = BENCHMARK_CELL_TYPE_GROUP, cont_cov=CONT_COV,
             scvi.model.MixUpVI.setup_anndata(
                 adata,
                 layer="counts",
@@ -121,6 +85,7 @@ def fit_mixupvi(adata: ad.AnnData,
             )
             mixupvi_model = scvi.model.MixUpVI(
                 adata,
+                n_latent=LATENT_SIZE,
                 use_batch_norm=USE_BATCH_NORM,
                 signature_type=SIGNATURE_TYPE,
                 loss_computation=LOSS_COMPUTATION,
@@ -146,7 +111,6 @@ def fit_mixupvi(adata: ad.AnnData,
 def fit_scvi(adata: ad.AnnData,
              model_path: str,
              save_model: bool = True,
-             batch_key: Optional[str] = "batch_key"
              ) -> scvi.model.SCVI:
 
     """Fit scVI model to single-cell RNA data."""
@@ -157,13 +121,14 @@ def fit_scvi(adata: ad.AnnData,
             scvi.model.SCVI.setup_anndata(
             adata,
             layer="counts",
-            # categorical_covariate_keys=["cell_type"],
-            # batch_index="batch_key", # no other cat covariate for now
-            # continuous_covariate_keys=["percent_mito", "percent_ribo"],
+            categorical_covariate_keys=BATCH_KEY,
             )
             scvi_model = scvi.model.SCVI(adata)
             scvi_model.view_anndata_setup()
-            scvi_model.train(max_epochs=MAX_EPOCHS, batch_size=128, train_size=TRAIN_SIZE)
+            scvi_model.train(max_epochs=MAX_EPOCHS,
+                             batch_size=128,
+                             train_size=TRAIN_SIZE,
+                            )
             if save_model:
                 scvi_model.save(model_path)
 
@@ -174,6 +139,7 @@ def fit_destvi(adata: ad.AnnData,
               model_path_1: str,
               model_path_2: str,
               cell_type_key: str = "cell_types_grouped",
+              save_model: bool = True,
               ) -> Tuple[scvi.model.CondSCVI, scvi.model.DestVI]:
   """Fit CondSCVI and DestVI model to paired single-cell/pseudoulk datasets."""
   # condscVI
@@ -189,7 +155,8 @@ def fit_destvi(adata: ad.AnnData,
         condscvi_model = scvi.model.CondSCVI(adata, weight_obs=False)
         condscvi_model.view_anndata_setup()
         condscvi_model.train(max_epochs=MAX_EPOCHS, train_size=TRAIN_SIZE)
-        condscvi_model.save(model_path_1)
+        if save_model:
+            condscvi_model.save(model_path_1)
   # DestVI
   if os.path.exists(model_path_2):
         logger.info(f"Model fitted, saved in path:{model_path_2}, loading DestVI...")
@@ -201,7 +168,9 @@ def fit_destvi(adata: ad.AnnData,
             )
         destvi_model = scvi.model.DestVI.from_rna_model(adata_pseudobulk, condscvi_model)
         destvi_model.view_anndata_setup()
-        destvi_model.train(max_epochs=MAX_EPOCHS)
+        destvi_model.train(max_epochs=2500)
+        if save_model:
+            destvi_model.save(model_path_2)
 
   return condscvi_model, destvi_model
 

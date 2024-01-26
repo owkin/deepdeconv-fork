@@ -14,7 +14,7 @@ def format_and_save_tuning_results(tuning_results, variable: str, training_datas
     for path in tuning_results.results:
         # loop through every result of hyperparameters tried
         path = path.path
-        hyperparameter = path.split("/")[6].split(f"{variable}=")[1].split("_")[0]
+        hyperparameter = path.split("/")[6].split(f"{variable}=")[1].split("-")[0][:-5]
         results = defaultdict(list)
         with open(path+"/result.json", "r") as ff:
             for line in ff:
@@ -29,6 +29,8 @@ def format_and_save_tuning_results(tuning_results, variable: str, training_datas
         results["hyperparameter"] = hyperparameter
         all_results.append(results)
     all_results = pd.concat(all_results)
+    if all_results.hyperparameter.str.isnumeric().all():
+        all_results.hyperparameter = pd.to_numeric(all_results.hyperparameter)
 
     # save results and search space
     save_dir = f"/home/owkin/project/mixupvi_tuning/{variable}/"
@@ -42,7 +44,12 @@ def format_and_save_tuning_results(tuning_results, variable: str, training_datas
     tuning_path = f"{new_path}/tuning_results.csv"
     search_path = f"{new_path}/search_space.pkl"
     all_results.to_csv(tuning_path)
-    best_hp = tuning_results.model_kwargs[variable] # best hp found by tuning main metric
+    if variable in tuning_results.model_kwargs:
+        best_hp = tuning_results.model_kwargs[variable] # best hp found by tuning main metric
+    elif variable in tuning_results.train_kwargs:
+        best_hp = tuning_results.train_kwargs[variable] # best hp found by tuning main metric
+    else:
+        best_hp = None
     search_space = tuning_results.search_space
     search_space["best_hp"] = best_hp
     with open(search_path, "wb") as ff:

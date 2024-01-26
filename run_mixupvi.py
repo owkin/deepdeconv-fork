@@ -24,13 +24,11 @@ from benchmark_utils import (
 from constants import (
     TUNE_MIXUPVI,
     SAVE_MODEL,
-    PATH,
     TRAINING_DATASET,
-    TRAINING_LOG,
     TRAINING_CELL_TYPE_GROUP,
 )
 from tuning_configs import (
-    SEARCH_SPACE, TUNED_VARIABLES, NUM_SAMPLES, METRIC, ADDITIONAL_METRICS,
+    SEARCH_SPACE, NUM_SAMPLES, METRIC, ADDITIONAL_METRICS,
 )
 
 
@@ -39,13 +37,12 @@ logger.info(f"Loading single-cell dataset: {TRAINING_DATASET} ...")
 cell_type = "cell_types_grouped"
 if TRAINING_DATASET == "TOY":
     adata_train = scvi.data.heart_cell_atlas_subsampled()
-    preprocess_scrna(adata_train, keep_genes=1200, log=TRAINING_LOG)
+    preprocess_scrna(adata_train, keep_genes=1200)
     cell_type = "cell_type"
 elif TRAINING_DATASET == "CTI":
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
-                     log=TRAINING_LOG,
                      batch_key="donor_id")
 elif TRAINING_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
@@ -53,12 +50,11 @@ elif TRAINING_DATASET == "CTI_RAW":
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
     preprocess_scrna(adata,
                      keep_genes=2500,
-                     log=TRAINING_LOG,
                      batch_key="donor_id",
     )
 elif TRAINING_DATASET == "CTI_PROCESSED":
-    adata = sc.read("/home/owkin/cti_data/processed/cti_processed.h5ad")
-    # adata = sc.read("/home/owkin/cti_data/processed/cti_processed_batch.h5ad")
+    # Load processed for speed-up (already filtered, normalised, etc.)
+    adata = sc.read("/home/owkin/cti_data/processed/cti_processed_2500.h5ad")
 
 
 # %% Add cell types groups and split train/test
@@ -81,11 +77,13 @@ if TUNE_MIXUPVI:
         training_dataset=TRAINING_DATASET,
     )
     model_history = all_results.loc[all_results.hyperparameter == best_hp] # plots for the best hp found by tuning
+    search_space = read_search_space(search_path)
 else:
+    model_path = f"project/models/{TRAINING_DATASET}_{TRAINING_CELL_TYPE_GROUP}_mixupvi.pkl"
     model = fit_mixupvi(
-        adata_train, 
-        model_path=PATH, 
-        cell_type_group=cell_type, 
+        adata_train,
+        model_path=model_path,
+        cell_type_group=cell_type,
         save_model=SAVE_MODEL
     )
     model_history = model.history
@@ -93,14 +91,14 @@ else:
 
 # %% Load model / results: Uncomment if not running previous cells
 # if TUNE_MIXUPVI:
-#     path = "/home/owkin/project/mixupvi_tuning/n_latent/TOY_dataset_tune_mixupvi_2023-12-15-11:15:32"
+#     path = "/home/owkin/project/mixupvi_tuning/batch_size/CTI_dataset_tune_mixupvi_2024-01-03-15:34:54"
 #     all_results = read_tuning_results(f"{path}/tuning_results.csv")
 #     search_space = read_search_space(f"{path}/search_space.pkl")
 #     best_hp = search_space["best_hp"]
 #     model_history = all_results.loc[all_results.hyperparameter == best_hp] # plots for the best hp found by tuning
 # else:
 #     import torch
-#     path = "/home/owkin/project/scvi_models/models/toy_100_epochs"
+#     path = PATH
 #     model = torch.load(f"{path}/model.pt")
 #     model_history = model["attr_dict"]["history_"]
 
@@ -120,8 +118,9 @@ plot_pearson_random(model_history, train=False, n_epochs=n_epochs)
 # %% Plots to compare HPs
 if TUNE_MIXUPVI:
     n_epochs = len(model_history["train_loss_epoch"])
-    tuned_variable = TUNED_VARIABLES[0]
-    hp_index_to_plot = [0, 1, 3, 4, 5] # only these index (of the HPs tried) will be plotted, for clearer visualisation
+    tuned_variable = list(search_space.keys())[0]
+    hp_index_to_plot = None
+    # hp_index_to_plot = [1, 2, 3] # only these index (of the HPs tried) will be plotted, for clearer visualisation
     compare_tuning_results(
         all_results, variable_to_plot="validation_loss", variable_tuned=tuned_variable,
         n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
