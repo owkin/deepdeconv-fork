@@ -14,14 +14,12 @@ from tuning_configs import TUNED_VARIABLES
 from constants import (
     MAX_EPOCHS,
     BATCH_SIZE,
-    BATCH_KEY,
     LATENT_SIZE,
     TRAIN_SIZE,
     CHECK_VAL_EVERY_N_EPOCH,
-    # BENCHMARK_CELL_TYPE_GROUP,
-    # CONT_COV,
+    CONT_COV,
+    CAT_COV,
     ENCODE_COVARIATES,
-    ENCODE_CONT_COVARIATES,
     SIGNATURE_TYPE,
     USE_BATCH_NORM,
     LOSS_COMPUTATION,
@@ -39,13 +37,13 @@ def tune_mixupvi(adata: ad.AnnData,
                   num_samples: int,
                   training_dataset: str,
 ):
-    CAT_COV = [cell_type_group] # + BATCH_KEY # add BATCH_KEY once training for cat cov is fixed
-    ## check missing for cell_group = BENCHMARK_CELL_TYPE_GROUP, cont_cov=CONT_COV,
     mixupvi_model = scvi.model.MixUpVI
     mixupvi_model.setup_anndata(
         adata,
         layer="counts",
-        categorical_covariate_keys=CAT_COV,  # only cell types for now
+        labels_key=cell_type_group,
+        categorical_covariate_keys=CAT_COV,
+        continuous_covariate_keys=CONT_COV,
     )
     scvi_tuner = autotune.ModelTuner(mixupvi_model)
     # scvi_tuner.info() # to look at all the HP/metrics tunable
@@ -75,23 +73,22 @@ def fit_mixupvi(adata: ad.AnnData,
             logger.info(f"Model fitted, saved in path:{model_path}, loading MixupVI...")
             mixupvi_model = scvi.model.MixUpVI.load(model_path, adata)
     else:
-            
-            CAT_COV = [cell_type_group] # + BATCH_KEY # add BATCH_KEY once training for cat cov is fixed
-            ## check missing for cell_group = BENCHMARK_CELL_TYPE_GROUP, cont_cov=CONT_COV,
             scvi.model.MixUpVI.setup_anndata(
                 adata,
                 layer="counts",
-                categorical_covariate_keys=CAT_COV,  # only cell types for now
+                labels_key=cell_type_group,
+                categorical_covariate_keys=CAT_COV,
+                continuous_covariate_keys=CONT_COV,
             )
             mixupvi_model = scvi.model.MixUpVI(
                 adata,
                 n_latent=LATENT_SIZE,
+                n_cell_types=adata.obs[cell_type_group].nunique(),
                 use_batch_norm=USE_BATCH_NORM,
                 signature_type=SIGNATURE_TYPE,
                 loss_computation=LOSS_COMPUTATION,
                 pseudo_bulk=PSEUDO_BULK,
-                encode_covariates=ENCODE_COVARIATES,  # always False for now, because cat covariates is only cell types
-                encode_cont_covariates=ENCODE_CONT_COVARIATES,  # if want to encode continuous covariates
+                encode_covariates=ENCODE_COVARIATES,
                 mixup_penalty=MIXUP_PENALTY,
                 dispersion=DISPERSION,
                 gene_likelihood=GENE_LIKELIHOOD,
@@ -121,7 +118,8 @@ def fit_scvi(adata: ad.AnnData,
             scvi.model.SCVI.setup_anndata(
             adata,
             layer="counts",
-            categorical_covariate_keys=BATCH_KEY,
+            categorical_covariate_keys=CAT_COV,
+            continuous_covariate_keys=CONT_COV,
             )
             scvi_model = scvi.model.SCVI(adata)
             scvi_model.view_anndata_setup()
