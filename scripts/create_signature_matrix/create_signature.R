@@ -20,9 +20,10 @@ library(MIND)
 source("~/deepdeconv/scripts/create_signature_matrix/helpers/Signature_function.R")
 source("~/deepdeconv/scripts/create_signature_matrix/helpers/Deconvolution_function.R")
 
-dir_out <- "~/project/Simon/signature_granular_updated_recorrected"
-dir_train_test_indices <- "~/project/train_test_index_matrix_granular_updated.csv"
-name_signature <- "CTI_granular_updated"
+dir_out <- "~/project/Simon/signature_3rd_level_granularity"
+dir_train_test_indices <- "~/project/train_test_index_dataframes/train_test_index_3rd_level.csv"
+name_signature <- "CTI_3rd_level_granularity"
+grouping_name <- "grouping" # the name of the grouping variable in the train_test_indices df
 
 
 # Load data
@@ -36,7 +37,7 @@ rownames(raw_X) <- ad$var_names
 colnames(raw_X) <- ad$obs_names
 
 train_test_cell_types = read.csv(dir_train_test_indices, row.names = 1)
-ad$obs$precise_groups_updated <- train_test_cell_types$precise_groups_updated
+ad$obs[[grouping_name]] <- train_test_cell_types[[grouping_name]]
 ad$obs$train_index <- train_test_cell_types$Train.index
 
 
@@ -70,7 +71,8 @@ expr = CreateSeuratObject(counts=raw_X_clean, meta.data=as.data.frame(ad$obs))
 
 dim(expr)
 # Remove some cell types
-expr_clean <- subset(x = expr, subset = precise_groups_updated != "To remove")
+subset_expr <- FetchData(object = expr, vars = grouping_name)
+expr_clean <- expr[, which(x = subset_expr != "To remove")]
 dim(expr_clean)
 # Removing mitochondrial and ribosomal genes
 genes.ribomit <- grep(pattern = "^RP[SL][[:digit:]]|^RP[[:digit:]]|^RPSA|^RPS|^RPL|^MT-|^MRPL",rownames(expr_clean))
@@ -98,10 +100,11 @@ scRNseq_t <- expr_clean[,unlist(trainIndex)]
 
 ## WARNING. The signature matrix function will not work if there is space inside the cell type names.
 ## Therefore, if needed, one should remove the spaces for the creation of the idents, like in the three following lines.
-# idents <- ifelse(scRNseq_t$precise_groups_updated == "CD4 T", "CD4T", scRNseq_t$precise_groups_updated)
+# idents <- ifelse(scRNseq_t[[grouping_name]][,grouping_name] == "CD4 T", "CD4T", scRNseq_t[[grouping_name]][,grouping_name])
 # idents <- ifelse(idents == "CD8 T", "CD8T", idents)
 # Idents(scRNseq_t) <- idents
-Idents(scRNseq_t) <- scRNseq_t$precise_groups_updated
+Idents(scRNseq_t) <- scRNseq_t[[grouping_name]][,grouping_name]
+names(Idents(scRNseq_t)) <- colnames(scRNseq_t)
 print(table(Idents(scRNseq_t)))
 if(!file.exists(file.path(dir_out,paste0("DE_",unique(Idents(scRNseq_t))[length(unique(Idents(scRNseq_t)))],".txt")))){
     DGE_celltypes(scRNseq_t,Idents(scRNseq_t),file.path(dir_out))

@@ -26,11 +26,11 @@ def create_signature(
         )
         ensg_names = map_hgnc_to_ensg(genes, adata)
         signature.index = ensg_names
-    elif signature_type == "crosstissue_general":
+    elif signature_type == "CTI_1st_level_granularity":
         signature = read_txt_r_signature(
             "/home/owkin/project/Almudena/Output/Crosstiss_Immune_norm/CTI.txt"
         )  # it is the normalised one (using adata.X and not adata.raw.X)
-    elif signature_type == "crosstissue_granular_updated":
+    elif signature_type == "CTI_2nd_level_granularity":
         signature = read_txt_r_signature(
             "/home/owkin/project/Simon/signature_granular_updated_corrected/CTI_granular_updated_ensg.txt"
         )
