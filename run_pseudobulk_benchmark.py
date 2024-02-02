@@ -56,7 +56,7 @@ elif BENCHMARK_DATASET == "CTI_RAW":
     )
 elif BENCHMARK_DATASET == "CTI_PROCESSED":
     # Load processed for speed-up (already filtered, normalised, etc.)
-    adata = sc.read("/home/owkin/data/cti_data/processed/cti_processed_2500.h5ad")
+    adata = sc.read("/home/owkin/data/cti_data/processed/cti_processed_3000.h5ad")
 
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {BENCHMARK_CELL_TYPE_GROUP}...")
@@ -81,9 +81,7 @@ if GENERATIVE_MODELS != []:
         model_path = f"project/models/{BENCHMARK_DATASET}_scvi.pkl"
         scvi_model = fit_scvi(adata_train,
                               model_path,
-                              save_model=SAVE_MODEL,
-                              # batch effect correction
-                              batch_key=["donor_id", "assay"])
+                              save_model=SAVE_MODEL)
         generative_models["scVI"] = scvi_model
     # 2. DestVI
     if "DestVI" in GENERATIVE_MODELS:
@@ -112,7 +110,7 @@ if GENERATIVE_MODELS != []:
     # 3. MixupVI
     if "MixupVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
-        model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi.pkl"
+        model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi_noL2.pkl"
         mixupvi_model = fit_mixupvi(adata_train,
                                     model_path,
                                     cell_type_group="cell_types_grouped",
