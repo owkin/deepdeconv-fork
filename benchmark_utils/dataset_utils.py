@@ -18,7 +18,7 @@ def preprocess_scrna(
     sc.pp.filter_genes(adata, min_counts=3)
     adata.layers["counts"] = adata.X.copy()  # preserve counts, used for training
     sc.pp.normalize_total(adata, target_sum=1e4)
-    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for 
+    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for
     sc.pp.log1p(adata)
     adata.raw = adata  # freeze the state in `.raw`
     sc.pp.highly_variable_genes(
@@ -66,13 +66,13 @@ def add_cell_types_grouped(
     It uses and returns the train_test_index csv file created for the signature matrix.
     """
     if group == "primary_groups":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_common.csv", index_col=1).iloc[:,1:]
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_common.csv", index_col=1).iloc[:,1:]
         col_name = "primary_groups"
     elif group == "precise_groups":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_granular.csv", index_col=1).iloc[:,1:]
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_granular.csv", index_col=1).iloc[:,1:]
         col_name = "precise_groups"
     elif group == "updated_granular_groups":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_granular_updated.csv", index_col=0)
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_granular_updated.csv", index_col=0)
         col_name = "precise_groups_updated"
     adata.obs["cell_types_grouped"] = train_test_index[col_name]
     return adata, train_test_index
