@@ -44,14 +44,14 @@ if BENCHMARK_DATASET == "TOY":
 elif BENCHMARK_DATASET == "CTI":
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     preprocess_scrna(adata,
-                     keep_genes=2500,
+                     keep_genes=3000,
                      batch_key="donor_id")
 elif BENCHMARK_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
     preprocess_scrna(adata,
-                     keep_genes=2500,
+                     keep_genes=3000,
                      batch_key="donor_id",
     )
 elif BENCHMARK_DATASET == "CTI_PROCESSED":
@@ -110,7 +110,7 @@ if GENERATIVE_MODELS != []:
     # 3. MixupVI
     if "MixupVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
-        model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi_noL2.pkl"
+        model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi_nobatch.pkl"
         mixupvi_model = fit_mixupvi(adata_train,
                                     model_path,
                                     cell_type_group="cell_types_grouped",
@@ -120,7 +120,9 @@ if GENERATIVE_MODELS != []:
 
 # %% Sanity check 3
 
-num_cells = [50, 100, 300, 500, 1000] #, 2000, 3000, 5000]
+#num_cells = [50, 100, 300, 500, 1000]
+
+num_cells = [2000]
 
 results = {}
 results_group = {}
@@ -159,15 +161,15 @@ for n in num_cells:
 if len(results) > 1:
     plot_deconv_lineplot(results,
                         save=True,
-                        filename=f"sim_pseudobulk_lineplot.png")
+                        filename=f"sim_pseudobulk_lineplot")
 else:
     key = list(results.keys())[0]
     plot_deconv_results(results[key],
                         save=True,
-                        filename=f"sim_pseudobulk_{key}.png")
+                        filename=f"sim_pseudobulk_{key}")
     plot_deconv_results_group(results_group[key],
                                 save=True,
-                                filename=f"sim_pseudobulk_{key}_per_celltype.png")
+                                filename=f"sim_pseudobulk_{key}_per_celltype")
 
 
 # %% (Optional) Sanity check 1.

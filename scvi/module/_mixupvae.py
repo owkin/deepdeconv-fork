@@ -18,7 +18,6 @@ from scvi.nn import Encoder
 from ._vae import VAE
 from ._utils import (
     run_incompatible_value_checks,
-    create_random_proportion,
     get_pearsonr_torch
 )
 
@@ -596,7 +595,7 @@ class MixUpVAE(VAE):
 
         mixup_loss = self.get_mix_up_loss(inference_outputs, generative_outputs)
 
-        loss = torch.mean(reconst_loss + weighted_kl_local) #+ mixup_loss
+        loss = torch.mean(reconst_loss + weighted_kl_local) + mixup_loss
 
         # correlation in latent space
         mean_z = torch.mean(inference_outputs["z"], axis=0)
