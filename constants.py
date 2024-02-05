@@ -2,7 +2,7 @@
 
 ## constants for run_mixupvi.py
 TUNE_MIXUPVI = False
-TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+TRAINING_DATASET = "CTI_PROCESSED"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_CELL_TYPE_GROUP = (
     "updated_granular_groups"  # ["primary_groups", "precise_groups", "updated_granular_groups"]
 )
@@ -19,14 +19,14 @@ BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
 GENERATIVE_MODELS = ["MixupVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
 # GENERATIVE_MODELS = [] # if only want baselines
-BASELINES = ["nnls", "TAPE", "Scaden"] # "nnls", "TAPE", "Scaden"
-# BASELINES = ["nnls"] # if only want nnls
+# BASELINES = ["nnls", "TAPE", "Scaden"] # "nnls", "TAPE", "Scaden"
+BASELINES = ["nnls"] # if only want nnls
 
 ## general mixupvi constants when training it or preprocessing data
-SAVE_MODEL = False
+SAVE_MODEL = True
 # MixUpVI training hyperparameters
 MAX_EPOCHS = 100
-BATCH_SIZE = 1024
+BATCH_SIZE = 4092
 TRAIN_SIZE = 0.7 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
