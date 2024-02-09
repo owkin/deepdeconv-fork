@@ -55,7 +55,7 @@ elif TRAINING_DATASET == "CTI_RAW":
     )
 elif TRAINING_DATASET == "CTI_PROCESSED":
     # Load processed for speed-up (already filtered, normalised, etc.)
-    adata = sc.read(f"/home/owkin/cti_data/processed/cti_processed_{N_GENES}.h5ad")
+    adata = sc.read(f"/home/owkin/project/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
 
 
 # %% Add cell types groups and split train/test

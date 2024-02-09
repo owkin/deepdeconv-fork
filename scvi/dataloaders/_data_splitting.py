@@ -223,7 +223,7 @@ class MixUpDataSplitter(DataSplitter):
         n_val = self.n_val
         indices = np.arange(self.adata_manager.adata.n_obs)
 
-        random_state = np.random.RandomState(seed=settings.seed) # settings.seed is None so new random state for each run
+        random_state = np.random.RandomState(seed=42) # settings.seed is None so new random state for each run
         if self.shuffle_set_split:
             indices = random_state.permutation(indices)
 

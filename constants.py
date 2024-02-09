@@ -33,8 +33,8 @@ CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI model hyperparameters
-CONT_COV = None  # list of continuous covariates to include
-CAT_COV = ["donor_id", "assay"] # list of categorical covariates to include
+CONT_COV = ["_scvi_labels"]  # list of continuous covariates to include
+CAT_COV = ["donor_id", "assay"] # ["donor_id", "assay"]
 ENCODE_COVARIATES = True # whether to encode cont/cat covars (they are always decoded)
 SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
