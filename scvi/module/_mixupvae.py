@@ -302,7 +302,7 @@ class MixUpVAE(VAE):
 
         if self.use_observed_lib_size:
             library = torch.log(x.sum(axis=1)).unsqueeze(1)
-            library_pseudobulk = torch.log(x.sum())
+            library_pseudobulk = torch.log(x_pseudobulk_.sum())
         if self.log_variational:
             x_ = torch.log(1 + x_)
             x_pseudobulk_ = torch.log(1 + x_pseudobulk_)
