@@ -112,8 +112,6 @@ plot_loss(model_history, n_epochs=n_epochs)
 plot_mixup_loss(model_history, n_epochs=n_epochs)
 plot_reconstruction_loss(model_history, n_epochs=n_epochs)
 plot_kl_loss(model_history, n_epochs=n_epochs)
-plot_pearson_random(model_history, train=True, n_epochs=n_epochs)
-plot_pearson_random(model_history, train=False, n_epochs=n_epochs)
 
 
 # %% Plots to compare HPs

@@ -15,6 +15,8 @@ from constants import (
     MAX_EPOCHS,
     BATCH_SIZE,
     LATENT_SIZE,
+    N_PSEUDOBULKS,
+    N_CELLS_PER_PSEUDOBULK,
     TRAIN_SIZE,
     CHECK_VAL_EVERY_N_EPOCH,
     CONT_COV,
@@ -27,6 +29,8 @@ from constants import (
     MIXUP_PENALTY,
     DISPERSION,
     GENE_LIKELIHOOD,
+    MIXUP_PENATLY_AGGREGATION,
+    AVERAGE_VARIABLES_MIXUP_PENALTY,
 )
 
 def tune_mixupvi(adata: ad.AnnData,
@@ -82,8 +86,9 @@ def fit_mixupvi(adata: ad.AnnData,
             )
             mixupvi_model = scvi.model.MixUpVI(
                 adata,
+                n_pseudobulks=N_PSEUDOBULKS,
+                n_cells_per_pseudobulk=N_CELLS_PER_PSEUDOBULK,
                 n_latent=LATENT_SIZE,
-                n_cell_types=adata.obs[cell_type_group].nunique(),
                 use_batch_norm=USE_BATCH_NORM,
                 signature_type=SIGNATURE_TYPE,
                 loss_computation=LOSS_COMPUTATION,
@@ -92,6 +97,8 @@ def fit_mixupvi(adata: ad.AnnData,
                 mixup_penalty=MIXUP_PENALTY,
                 dispersion=DISPERSION,
                 gene_likelihood=GENE_LIKELIHOOD,
+                mixup_penalty_aggregation=MIXUP_PENATLY_AGGREGATION,
+                average_variables_mixup_penalty=AVERAGE_VARIABLES_MIXUP_PENALTY,
             )
             mixupvi_model.view_anndata_setup()
             mixupvi_model.train(

@@ -81,13 +81,14 @@ def create_random_proportion(
     return np.random.permutation(proportion_vector)
 
 
-def get_pearsonr_torch(x, y):
+def get_mean_pearsonr_torch(x, y):
     """
     Mimics `scipy.stats.pearsonr`
+    Rewritten to adapt to 2D tensors, to compute the mean of the 1D correlations along the first axis.
     Arguments
     ---------
-    x : 1D torch.Tensor
-    y : 1D torch.Tensor
+    x : 2D torch.Tensor
+    y : 2D torch.Tensor
     Returns
     -------
     r_val : float
@@ -105,14 +106,14 @@ def get_pearsonr_torch(x, y):
         >>> th_corr = pearsonr(torch.from_numpy(x), torch.from_numpy(y))
         >>> np.allclose(sp_corr, th_corr)
     """
-    mean_x = torch.mean(x)
-    mean_y = torch.mean(y)
+    mean_x = torch.mean(x, axis=1).unsqueeze(dim=1)
+    mean_y = torch.mean(y, axis=1).unsqueeze(dim=1)
     xm = x.sub(mean_x)
     ym = y.sub(mean_y)
-    r_num = xm.dot(ym)
-    r_den = torch.norm(xm, 2) * torch.norm(ym, 2)
+    r_num = (xm*ym).sum(dim=1)
+    r_den = torch.norm(xm, p=2, dim=1) * torch.norm(ym, p=2, dim=1)
     r_val = r_num / r_den
-    return r_val
+    return torch.mean(r_val)
 
 
 def run_incompatible_value_checks(

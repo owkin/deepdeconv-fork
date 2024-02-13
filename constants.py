@@ -33,17 +33,21 @@ CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI model hyperparameters
+N_PSEUDOBULKS = 1
+N_CELLS_PER_PSEUDOBULK = None # None (then will be batch size) or int (will cap at batch size)
+LATENT_SIZE = 30
 CONT_COV = ["_scvi_labels"]  # list of continuous covariates to include
 CAT_COV = ["donor_id", "assay"] # ["donor_id", "assay"]
 ENCODE_COVARIATES = True # whether to encode cont/cat covars (they are always decoded)
-SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
-USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
 PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
+SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 MIXUP_PENALTY = "l2"  # ["l2", "kl"]
-DISPERSION = "gene"  # ["gene", "gene_cell"]
+DISPERSION = "gene"  # ["gene", "gene_label"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
-LATENT_SIZE = 30
+MIXUP_PENATLY_AGGREGATION = "mean" # ["mean", "sum", "max"]
+AVERAGE_VARIABLES_MIXUP_PENALTY = False 
+USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 
 # different possibilities of cell groupings with the CTI dataset
 GROUPS = {

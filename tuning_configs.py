@@ -14,6 +14,10 @@ from constants import (
     TRAIN_SIZE,
     BATCH_SIZE,
     LATENT_SIZE,
+    N_PSEUDOBULKS,
+    N_CELLS_PER_PSEUDOBULK,
+    MIXUP_PENATLY_AGGREGATION,
+    AVERAGE_VARIABLES_MIXUP_PENALTY,
 )
 
 
@@ -81,7 +85,10 @@ model_fixed_hps = {
     "train_size": TRAIN_SIZE,
     "batch_size": BATCH_SIZE,
     "n_latent": LATENT_SIZE,
-    "n_cell_types": len(GROUPS[TRAINING_CELL_TYPE_GROUP]) - 1,
+    "n_pseudobulks": N_PSEUDOBULKS,
+    "n_cells_per_pseudobulk": N_CELLS_PER_PSEUDOBULK,
+    "mixup_penalty_aggregation": MIXUP_PENATLY_AGGREGATION,
+    "average_variables_mixup_penalty": AVERAGE_VARIABLES_MIXUP_PENALTY,
 }
 for key in list(model_fixed_hps):
     # don't replace the search space by fixed hyperparemeter value
