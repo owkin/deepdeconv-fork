@@ -17,8 +17,8 @@ from scvi.nn import one_hot
 from scvi.nn import Encoder
 from ._vae import VAE
 from ._utils import (
-    run_incompatible_value_checks, 
-    create_random_proportion, 
+    run_incompatible_value_checks,
+    create_random_proportion,
     get_pearsonr_torch
 )
 
@@ -56,7 +56,7 @@ class MixUpVAE(VAE):
     n_cats_per_cov
         Number of categories for each extra categorical covariate
     n_cell_types
-        Number of cell types for this granularity. We don't compute it inside a forward 
+        Number of cell types for this granularity. We don't compute it inside a forward
         pass, as it can vary from batch to batch.
     dropout_rate
         Dropout rate for neural networks
@@ -196,7 +196,7 @@ class MixUpVAE(VAE):
             mixup_penalty=mixup_penalty,
             gene_likelihood=gene_likelihood,
         )
-        
+
         self.n_cell_types = n_cell_types
         self.signature_type = signature_type
         self.loss_computation = loss_computation
@@ -302,8 +302,8 @@ class MixUpVAE(VAE):
         x_signature_ = torch.stack(x_signature_, dim=0)
 
         if self.use_observed_lib_size:
-            library = torch.log(x.sum(axis=1)).unsqueeze(1)
-            library_pseudobulk = torch.log(x.sum())
+            library = torch.log(x_.sum(axis=1)).unsqueeze(1)
+            library_pseudobulk = torch.log(x_pseudobulk_.sum())
         if self.log_variational:
             x_ = torch.log(1 + x_)
             x_pseudobulk_ = torch.log(1 + x_pseudobulk_)
@@ -350,7 +350,7 @@ class MixUpVAE(VAE):
             categorical_input = ()
             categorical_pseudobulk_input = ()
             categorical_signature_input = ()
-        
+
         # regular encoding
         qz, z = self.z_encoder(
             encoder_input,
