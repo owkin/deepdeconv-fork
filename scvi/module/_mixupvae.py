@@ -622,11 +622,6 @@ class MixUpVAE(VAE):
         mse_deconv = np.mean((proportions_array - predicted_proportions) ** 2)
         mae_deconv = np.mean(np.abs(proportions_array - predicted_proportions))
 
-        # Per cell type  deconvolution error
-        # mse_deconv_per_cell_type = np.mean(
-        #     (proportions_array - predicted_proportions) ** 2, axis=0
-        # )
-
         # logging
         kl_local = {
             "kl_divergence_l": kl_divergence_l,
