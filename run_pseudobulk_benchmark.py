@@ -9,6 +9,7 @@ from constants import (
     SIGNATURE_CHOICE,
     BENCHMARK_CELL_TYPE_GROUP,
     SAVE_MODEL,
+    N_INPUT,
     N_SAMPLES,
     GENERATIVE_MODELS,
     BASELINES,
@@ -112,7 +113,7 @@ if GENERATIVE_MODELS != []:
     # 3. MixupVI
     if "MixupVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
-        model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_mixupvi.pkl"
+        model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_{N_INPUT}_mixupvi.pkl"
         mixupvi_model = fit_mixupvi(adata_train,
                                     model_path,
                                     cell_type_group="cell_types_grouped",
@@ -129,12 +130,12 @@ results_group = {}
 
 for n in num_cells:
     logger.info(f"Pseudobulk simulation with {n} sampled cells ...")
-    adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
+    all_adata_samples_test, adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
         adata_test,
         prior_alphas = None,
         n_sample = N_SAMPLES,
         n_cells = n,
-        add_sparsity=True
+        add_sparsity=False # useless in the current modifications
     )
     # decomment following for Sanity check 2.
     # adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_uniform_pseudobulk_dataset(
@@ -147,6 +148,7 @@ for n in num_cells:
         adata_train=adata_train,
         adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
         adata_pseudobulk_test_rc=adata_pseudobulk_test_rc,
+        all_adata_samples_test=all_adata_samples_test,
         df_proportions_test=df_proportions_test,
         signature=signature,
         intersection=intersection,

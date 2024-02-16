@@ -12,6 +12,7 @@ from .dataset_utils import create_anndata_pseudobulk
 
 def create_latent_signature(
     adata: ad.AnnData,
+    use_mixupvi: bool = False,
     repeats: int = 1,
     average_all_cells: bool = True,
     sc_per_pseudobulk: int = 3000,
@@ -109,16 +110,21 @@ def create_latent_signature(
                     assert (
                         count_key is not None
                     ), "Must give a count key if aggregating before embedding."
-
-                    pseudobulk = (
-                        adata_sampled.layers[count_key].mean(axis=0).reshape(1, -1)
-                    )  # .astype(int).astype(numpy.float32)
-                    adata_pseudobulk = create_anndata_pseudobulk(
-                        adata_sampled, pseudobulk
-                    )
-                    result = model.get_latent_representation(adata_pseudobulk).reshape(
-                        -1
-                    )
+                    
+                    if use_mixupvi:
+                        result = model.get_latent_representation(
+                            adata_sampled, get_pseudobulk=True
+                        ).reshape(-1)
+                    else:
+                        pseudobulk = (
+                            adata_sampled.layers[count_key].mean(axis=0).reshape(1, -1)
+                        )  # .astype(int).astype(numpy.float32)
+                        adata_pseudobulk = create_anndata_pseudobulk(
+                            adata_sampled, pseudobulk
+                        )
+                        result = model.get_latent_representation(adata_pseudobulk).reshape(
+                            -1
+                        )
                 else:
                     raise ValueError(
                         "Only pre-encoded signatures are supported for now."

@@ -19,11 +19,12 @@ BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
 GENERATIVE_MODELS = ["MixupVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
 # GENERATIVE_MODELS = [] # if only want baselines
-BASELINES = ["nnls", "TAPE", "Scaden"] # "nnls", "TAPE", "Scaden"
+BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
 # BASELINES = ["nnls"] # if only want nnls
 
 ## general mixupvi constants when training it or preprocessing data
 SAVE_MODEL = False
+N_INPUT = 2500 # number of input genes
 # MixUpVI training hyperparameters
 MAX_EPOCHS = 100
 BATCH_SIZE = 1024
