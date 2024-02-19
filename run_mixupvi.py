@@ -24,6 +24,7 @@ from benchmark_utils import (
 from constants import (
     TUNE_MIXUPVI,
     SAVE_MODEL,
+    N_GENES,
     TRAINING_DATASET,
     TRAINING_CELL_TYPE_GROUP,
 )
@@ -42,19 +43,19 @@ if TRAINING_DATASET == "TOY":
 elif TRAINING_DATASET == "CTI":
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     preprocess_scrna(adata,
-                     keep_genes=2500,
+                     keep_genes=N_GENES,
                      batch_key="donor_id")
 elif TRAINING_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
     preprocess_scrna(adata,
-                     keep_genes=2500,
+                     keep_genes=N_GENES,
                      batch_key="donor_id",
     )
 elif TRAINING_DATASET == "CTI_PROCESSED":
     # Load processed for speed-up (already filtered, normalised, etc.)
-    adata = sc.read("/home/owkin/cti_data/processed/cti_processed_2500.h5ad")
+    adata = sc.read(f"/home/owkin/cti_data/processed/cti_processed_{N_GENES}.h5ad")
 
 
 # %% Add cell types groups and split train/test
@@ -79,7 +80,7 @@ if TUNE_MIXUPVI:
     model_history = all_results.loc[all_results.hyperparameter == best_hp] # plots for the best hp found by tuning
     search_space = read_search_space(search_path)
 else:
-    model_path = f"project/models/{TRAINING_DATASET}_{TRAINING_CELL_TYPE_GROUP}_mixupvi.pkl"
+    model_path = f"project/models/{TRAINING_DATASET}_{TRAINING_CELL_TYPE_GROUP}_{N_GENES}_mixupvi.pkl"
     model = fit_mixupvi(
         adata_train,
         model_path=model_path,
