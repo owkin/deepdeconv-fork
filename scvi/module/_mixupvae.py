@@ -1,6 +1,7 @@
 """Main module."""
 import logging
 from typing import Callable, Iterable, Literal, Optional
+import copy
 
 import numpy as np
 import torch
@@ -289,7 +290,7 @@ class MixUpVAE(VAE):
         x_ = x
         x_pseudobulk_ = x.mean(axis=0).unsqueeze(0)
 
-        # create signature
+        # compute proportions in batch
         unique_indices, counts = y.unique(return_counts=True)
         proportions = counts.float() / len(y)
         # create training signature
@@ -300,18 +301,25 @@ class MixUpVAE(VAE):
             x_signature_.append(x_pure)
         x_signature_ = torch.stack(x_signature_, dim=0)
 
+        # library size
         if self.use_observed_lib_size:
             library = torch.log(x.sum(axis=1)).unsqueeze(1)
             library_pseudobulk = torch.log(x_pseudobulk_.sum())
+
+        # transform in logscale
         if self.log_variational:
             x_ = torch.log(1 + x_)
             x_pseudobulk_ = torch.log(1 + x_pseudobulk_)
             x_signature_ = torch.log(1 + x_signature_)
-        if cont_covs is not None and self.encode_covariates:
+
+        # continuous covariates
+        if cont_covs is not None:
+            # for single-cell and pseudobulk
             encoder_input = torch.cat((x_, cont_covs), dim=-1)
             encoder_pseudobulk_input = torch.cat(
                 (x_pseudobulk_, cont_covs.mean(axis=0).unsqueeze(1)), dim=-1
             )
+            # for the signature
             cont_covs_signature = []
             for cell_type in unique_indices:
                 idx = (y == cell_type).flatten()
@@ -325,7 +333,9 @@ class MixUpVAE(VAE):
             encoder_input = x_
             encoder_pseudobulk_input = x_pseudobulk_
             encoder_signature_input = x_signature_
-        if cat_covs is not None and self.encode_covariates:
+
+        # categorical covariates
+        if cat_covs is not None:
             cat_covs = torch.split(cat_covs, 1, dim=1)
             categorical_input = []
             categorical_pseudobulk_input = []
@@ -345,7 +355,11 @@ class MixUpVAE(VAE):
                         categorical_signature_input_temp.append(one_hot_cat_covs_pure)
                     categorical_signature_input.append(torch.stack(categorical_signature_input_temp))
                     j+=1
-        else:
+            categorical_input_bis = copy.copy(categorical_input)
+            categorical_pseudobulk_input_bis = copy.copy(categorical_pseudobulk_input)
+
+        # Encode covariates
+        if not self.encode_covariates:
             categorical_input = ()
             categorical_pseudobulk_input = ()
             categorical_signature_input = ()
@@ -414,13 +428,13 @@ class MixUpVAE(VAE):
             "qz": qz,
             "ql": ql,
             "library": library,
-            "categorical_input": categorical_input,
+            "categorical_input": categorical_input_bis,
             # pseudobulk encodings
             "z_pseudobulk": z_pseudobulk,
             "qz_pseudobulk": qz_pseudobulk,
             "ql_pseudobulk": ql_pseudobulk,
             "library_pseudobulk": library_pseudobulk,
-            "categorical_pseudobulk_input": categorical_pseudobulk_input,
+            "categorical_pseudobulk_input": categorical_pseudobulk_input_bis,
             # pure cell type signature encodings
             "proportions": proportions,
             "z_signature": z_signature,
