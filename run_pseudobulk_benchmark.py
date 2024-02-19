@@ -82,9 +82,7 @@ if GENERATIVE_MODELS != []:
         model_path = f"project/models/{BENCHMARK_DATASET}_scvi.pkl"
         scvi_model = fit_scvi(adata_train,
                               model_path,
-                              save_model=SAVE_MODEL,
-                              # batch effect correction
-                              batch_key=["donor_id", "assay"])
+                              save_model=SAVE_MODEL)
         generative_models["scVI"] = scvi_model
     # 2. DestVI
     if "DestVI" in GENERATIVE_MODELS:
@@ -123,7 +121,9 @@ if GENERATIVE_MODELS != []:
 
 # %% Sanity check 3
 
-num_cells = [50, 100, 300, 500, 1000] #, 2000, 3000, 5000]
+#num_cells = [50, 100, 300, 500, 1000]
+
+num_cells = [2000]
 
 results = {}
 results_group = {}
@@ -163,15 +163,15 @@ for n in num_cells:
 if len(results) > 1:
     plot_deconv_lineplot(results,
                         save=True,
-                        filename=f"sim_pseudobulk_lineplot.png")
+                        filename=f"sim_pseudobulk_lineplot")
 else:
     key = list(results.keys())[0]
     plot_deconv_results(results[key],
                         save=True,
-                        filename=f"sim_pseudobulk_{key}.png")
+                        filename=f"sim_pseudobulk_{key}")
     plot_deconv_results_group(results_group[key],
                                 save=True,
-                                filename=f"sim_pseudobulk_{key}_per_celltype.png")
+                                filename=f"sim_pseudobulk_{key}_per_celltype")
 
 
 # %% (Optional) Sanity check 1.

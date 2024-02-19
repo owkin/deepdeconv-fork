@@ -17,8 +17,7 @@ from scvi.nn import one_hot
 from scvi.nn import Encoder
 from ._vae import VAE
 from ._utils import (
-    run_incompatible_value_checks, 
-    create_random_proportion, 
+    run_incompatible_value_checks,
     get_pearsonr_torch
 )
 
@@ -56,7 +55,7 @@ class MixUpVAE(VAE):
     n_cats_per_cov
         Number of categories for each extra categorical covariate
     n_cell_types
-        Number of cell types for this granularity. We don't compute it inside a forward 
+        Number of cell types for this granularity. We don't compute it inside a forward
         pass, as it can vary from batch to batch.
     dropout_rate
         Dropout rate for neural networks
@@ -196,7 +195,7 @@ class MixUpVAE(VAE):
             mixup_penalty=mixup_penalty,
             gene_likelihood=gene_likelihood,
         )
-        
+
         self.n_cell_types = n_cell_types
         self.signature_type = signature_type
         self.loss_computation = loss_computation
@@ -303,7 +302,7 @@ class MixUpVAE(VAE):
 
         if self.use_observed_lib_size:
             library = torch.log(x.sum(axis=1)).unsqueeze(1)
-            library_pseudobulk = torch.log(x.sum())
+            library_pseudobulk = torch.log(x_pseudobulk_.sum())
         if self.log_variational:
             x_ = torch.log(1 + x_)
             x_pseudobulk_ = torch.log(1 + x_pseudobulk_)
@@ -350,7 +349,7 @@ class MixUpVAE(VAE):
             categorical_input = ()
             categorical_pseudobulk_input = ()
             categorical_signature_input = ()
-        
+
         # regular encoding
         qz, z = self.z_encoder(
             encoder_input,
@@ -619,13 +618,9 @@ class MixUpVAE(VAE):
             / np.linalg.norm(predicted_proportions)
         )
         pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
-
-        # random proportions correlation
-
-        random_proportions = create_random_proportion(
-            n_classes=len(proportions_array), n_non_zero=None
-        )
-        pearson_coeff_random = pearsonr(proportions_array, random_proportions)[0]
+        # Deconvolution error
+        mse_deconv = np.mean((proportions_array - predicted_proportions) ** 2)
+        mae_deconv = np.mean(np.abs(proportions_array - predicted_proportions))
 
         # logging
         kl_local = {
@@ -642,7 +637,8 @@ class MixUpVAE(VAE):
                 "pearson_coeff": pearson_coeff,
                 "cosine_similarity": cosine_similarity,
                 "pearson_coeff_deconv": pearson_coeff_deconv,
-                "pearson_coeff_random": pearson_coeff_random,
+                "mse_deconv": mse_deconv,
+                "mae_deconv": mae_deconv,
             },
         )
 
