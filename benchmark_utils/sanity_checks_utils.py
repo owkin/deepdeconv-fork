@@ -160,6 +160,7 @@ def run_sanity_check(
     adata_train: ad.AnnData,
     adata_pseudobulk_test_counts: ad.AnnData,
     adata_pseudobulk_test_rc: ad.AnnData,
+    all_adata_samples_test: List[ad.AnnData],
     df_proportions_test: pd.DataFrame,
     signature: pd.DataFrame,
     intersection: List[str],
@@ -260,14 +261,20 @@ def run_sanity_check(
             df_test_correlations.loc[:, "DestVI"] = correlations.values
             df_test_group_correlations.loc[:, "DestVI"] = group_correlations.values
         else:
+            use_mixupvi=False
+            if model == "MixupVI":
+                use_mixupvi=True
             adata_latent_signature = create_latent_signature(
                 adata=adata_train,
                 model=generative_models[model],
+                use_mixupvi=use_mixupvi,
                 average_all_cells = True,
                 sc_per_pseudobulk=10000,
             )
             deconv_results = perform_latent_deconv(
                 adata_pseudobulk=adata_pseudobulk_test_counts,
+                all_adata_samples=all_adata_samples_test,
+                use_mixupvi=use_mixupvi,
                 adata_latent_signature=adata_latent_signature,
                 model=generative_models[model],
             )

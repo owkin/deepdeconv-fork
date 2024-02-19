@@ -232,6 +232,7 @@ def create_dirichlet_pseudobulk_dataset(
 
     random.seed(seed)
     averaged_data, group = {"relative_counts": [], "counts": []}, []
+    all_adata_samples = []
     for i in range(n_sample):
         sample_data = []
         for j, cell_type in enumerate(likelihood_alphas.index):
@@ -244,15 +245,18 @@ def create_dirichlet_pseudobulk_dataset(
         if aggregation_method == "mean":
             averaged_data["relative_counts"].append(adata_sample.layers["relative_counts"].mean(axis=0).tolist()[0])
             X = np.array(adata_sample.layers["counts"].mean(axis=0).tolist()[0])
-            if add_sparsity:
-                X = random_state.binomial(1, 0.2, X.shape[0]) * X
+            # TODO: For now, we remove the possibility to add sparsity, as all_adata_samples would not be affected
+            # if add_sparsity:
+            #     X = random_state.binomial(1, 0.2, X.shape[0]) * X
             averaged_data["counts"].append(X)
-        else:
-            averaged_data["relative_counts"].append(adata_sample.layers["relative_counts"].sum(axis=0).tolist()[0])
-            X = np.array(adata_sample.layers["counts"].mean(axis=0).tolist()[0])
-            if add_sparsity:
-                X = random_state.binomial(1, 0.2, X.shape[0]) * X
-            averaged_data["counts"].append(X)
+        # TODO: For now, we remove the possibility to aggregate by sum, as all_adata_samples would not be affected
+        # else:
+        #     averaged_data["relative_counts"].append(adata_sample.layers["relative_counts"].sum(axis=0).tolist()[0])
+        #     X = np.array(adata_sample.layers["counts"].mean(axis=0).tolist()[0])
+        #     if add_sparsity:
+        #         X = random_state.binomial(1, 0.2, X.shape[0]) * X
+        #     averaged_data["counts"].append(X)
+        all_adata_samples.append(adata_sample)
 
     # pseudobulk dataset
     adata_pseudobulk_rc = create_anndata_pseudobulk(adata,
@@ -271,4 +275,4 @@ def create_dirichlet_pseudobulk_dataset(
     groundtruth_fractions = groundtruth_fractions.fillna(
         0
     )  # The Nan are cells not sampled
-    return adata_pseudobulk_counts, adata_pseudobulk_rc, groundtruth_fractions
+    return all_adata_samples, adata_pseudobulk_counts, adata_pseudobulk_rc, groundtruth_fractions
