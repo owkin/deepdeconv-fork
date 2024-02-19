@@ -24,7 +24,7 @@ BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
 
 ## general mixupvi constants when training it or preprocessing data
 SAVE_MODEL = False
-N_INPUT = 2500 # number of input genes
+N_GENES = 3000 # number of input genes after preprocessing
 # MixUpVI training hyperparameters
 MAX_EPOCHS = 100
 BATCH_SIZE = 1024
