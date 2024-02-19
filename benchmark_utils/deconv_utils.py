@@ -46,7 +46,9 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
                           model: Optional[Union[scvi.model.SCVI,
                                                 scvi.model.MixUpVI,
                                                 scvi.model.CondSCVI]],
-                          use_nnls: bool = False,
+                          all_adata_samples,
+                          use_mixupvi: bool = True,
+                          use_nnls: bool = True,
                           use_softmax: bool = False) -> pd.DataFrame:
     """Perform deconvolution in latent space using the nnls method.
 
@@ -69,12 +71,18 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
         Deconvolution results of shape (n_samples, n_cell_types)
     """
     # with torch.no_grad():
-    adata_pseudobulk = ad.AnnData(X=adata_pseudobulk.layers["counts"],
-                                  obs=adata_pseudobulk.obs,
-                                  var=adata_pseudobulk.var)
-    adata_pseudobulk.layers["counts"] = adata_pseudobulk.X.copy()
+    if use_mixupvi:
+        latent_pseudobulks=[]
+        for i in range(len(all_adata_samples)):
+            latent_pseudobulks.append(model.get_latent_representation(all_adata_samples[i], get_pseudobulk=True))
+        latent_pseudobulk = np.concatenate(latent_pseudobulks, axis=0)
+    else:
+        adata_pseudobulk = ad.AnnData(X=adata_pseudobulk.layers["counts"],
+                                    obs=adata_pseudobulk.obs,
+                                    var=adata_pseudobulk.var)
+        adata_pseudobulk.layers["counts"] = adata_pseudobulk.X.copy()
 
-    latent_pseudobulk = model.get_latent_representation(adata_pseudobulk)
+        latent_pseudobulk = model.get_latent_representation(adata_pseudobulk)
 
     if use_nnls:
         deconv = LinearRegression(positive=True).fit(adata_latent_signature.X.T,
