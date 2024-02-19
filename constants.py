@@ -4,15 +4,21 @@
 TUNE_MIXUPVI = False
 TRAINING_DATASET = "CTI_PROCESSED"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_CELL_TYPE_GROUP = (
-    "2nd_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "FACS_1st_level_granularity"]
+    "2nd_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
 )
 
 ## constants for run_pseudobulk_benchmark.py
-SIGNATURE_CHOICE = "CTI_2nd_level_granularity" # ["laughney", "CTI_1st_level_granularity", "CTI_2nd_level_granularity"]
+SIGNATURE_CHOICE = "CTI_2nd_level_granularity" # ["laughney", "CTI_1st_level_granularity", "CTI_2nd_level_granularity", "CTI_3rd_level_granularity", "CTI_4th_level_granularity", "FACS_1st_level_granularity"]
 if SIGNATURE_CHOICE in ["laughney", "CTI_1st_level_granularity"]:
     BENCHMARK_CELL_TYPE_GROUP = "1st_level_granularity"
 elif SIGNATURE_CHOICE == "CTI_2nd_level_granularity":
     BENCHMARK_CELL_TYPE_GROUP = "2nd_level_granularity"
+elif SIGNATURE_CHOICE == "CTI_3rd_level_granularity":
+    BENCHMARK_CELL_TYPE_GROUP = "3rd_level_granularity"
+elif SIGNATURE_CHOICE == "CTI_4th_level_granularity":
+    BENCHMARK_CELL_TYPE_GROUP = "4th_level_granularity"
+elif SIGNATURE_CHOICE == "CTI_4th_level_granularity":
+    BENCHMARK_CELL_TYPE_GROUP = "FACS_1st_level_granularity"
 else:
     BENCHMARK_CELL_TYPE_GROUP = None # no signature was created
 BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
@@ -138,6 +144,33 @@ GROUPS = {
                       "Cycling T&NK", "MNP/B doublets", "MNP/T doublets", "ILC3", 
                       "MAIT","T_CD4/CD8", "Erythroid", "Megakaryocytes", "Progenitor"],
 
+    },
+    "4th_level_granularity": {
+        "immatureB": ["Pre-B", "Pro-B"],
+       	"naiveB": [ "Naive B cells"],
+        "memB": [ "Memory B cells"],
+        "Plasma cells": ["Plasma cells"],
+        "Plasmablasts": ["Plasmablasts"],
+        "Classical monocytes": ["Classical monocytes"],
+        "Non-Classical monocytes": [ "Nonclassical monocytes"],
+        "Macro":["Alveolar macrophages","Erythrophagocytic macrophages", "Intermediate macrophages",
+                 "Intestinal macrophages"],
+        "naive_CD8T": [ "Tnaive/CM_CD8"],
+        "mem_CD8T": ["Tem/emra_CD8", "Trm/em_CD8", "Trm_gut_CD8"],
+        "naive_CD4T":[ "Tfh", "Tnaive/CM_CD4", "Tnaive/CM_CD4_activated"],
+        "mem_CD4T":["Teffector/EM_CD4", "Trm_Th1/Th17"],
+        "Tregs":["Tregs"],
+        "gdT":["Tgd_CRTAM+", "Trm_Tgd"],
+        "NK_CD16+": ["NK_CD16+"],
+        "NK_CD16-": [ "NK_CD56bright_CD16-"],
+        "DC1": ["DC1"],
+        "DC2": [ "DC2"],
+        "migDC": [ "migDC"],
+        "pDC": ["pDC"],
+        "Mast": ["Mast cells"],
+        "To remove": ["ABCs", "GC_B (I)", "GC_B (II)","Cycling", "T/B doublets", 
+                      "Cycling T&NK", "MNP/B doublets", "MNP/T doublets", "ILC3", 
+                      "MAIT","T_CD4/CD8", "Erythroid", "Megakaryocytes", "Progenitor"],
     },
     "FACS_1st_level_granularity": {
         "B": ["Pre-B", "Pro-B", "Naive B cells","Memory B cells","Plasma cells"],

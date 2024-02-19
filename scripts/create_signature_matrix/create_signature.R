@@ -20,9 +20,9 @@ library(MIND)
 source("~/deepdeconv/scripts/create_signature_matrix/helpers/Signature_function.R")
 source("~/deepdeconv/scripts/create_signature_matrix/helpers/Deconvolution_function.R")
 
-dir_out <- "~/project/Simon/signature_3rd_level_granularity"
-dir_train_test_indices <- "~/project/train_test_index_dataframes/train_test_index_3rd_level.csv"
-name_signature <- "CTI_3rd_level_granularity"
+dir_out <- "~/project/Simon/signature_4th_level_granularity"
+dir_train_test_indices <- "~/project/train_test_index_dataframes/train_test_index_4th_level.csv"
+name_signature <- "CTI_4th_level_granularity"
 grouping_name <- "grouping" # the name of the grouping variable in the train_test_indices df
 
 

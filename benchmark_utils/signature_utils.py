@@ -32,7 +32,19 @@ def create_signature(
         )  # it is the normalised one (using adata.X and not adata.raw.X)
     elif signature_type == "CTI_2nd_level_granularity":
         signature = read_txt_r_signature(
-            "/home/owkin/project/Simon/signature_granular_updated_corrected/CTI_granular_updated_ensg.txt"
+            "/home/owkin/project/Simon/signature_granular_updated_recorrected/CTI_granular_updated_ensg.txt"
+        )
+    elif signature_type == "CTI_3rd_level_granularity":
+        signature = read_txt_r_signature(
+            "/home/owkin/project/Simon/signature_3rd_level_granularity/CTI_3rd_level_granularity_ensg.txt"
+        )
+    elif signature_type == "CTI_4th_level_granularity":
+        signature = read_txt_r_signature(
+            "/home/owkin/project/Simon/signature_4th_level_granularity/CTI_4th_level_granularity_ensg.txt"
+        )
+    elif signature_type == "FACS_1st_level_granularity":
+        signature = read_txt_r_signature(
+            "/home/owkin/project/Simon/signature_FACS_1st_level_granularity/FACS_1st_level_granularity_ensg.txt"
         )
     # intersection between all genes and marker genes
     intersection = list(set(adata.var_names).intersection(signature.index))

@@ -96,11 +96,20 @@ def add_cell_types_grouped(
     It uses and returns the train_test_index csv file created for the signature matrix.
     """
     if group == "1st_level_granularity":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_common.csv", index_col=1).iloc[:,1:]
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_common.csv", index_col=1).iloc[:,1:]
         col_name = "primary_groups"
     elif group == "2nd_level_granularity":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_matrix_granular_updated.csv", index_col=0)
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_granular_updated.csv", index_col=0)
         col_name = "precise_groups_updated"
+    elif group == "3rd_level_granularity":
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_3rd_level.csv", index_col=1).iloc[:,1:]
+        col_name = "grouping"
+    elif group == "4th_level_granularity":
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_4th_level.csv", index_col=1).iloc[:,1:]
+        col_name = "grouping"
+    elif group == "FACS_1st_level_granularity":
+        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_facs_1st_level.csv", index_col=1).iloc[:,1:]
+        col_name = "grouping"
     adata.obs["cell_types_grouped"] = train_test_index[col_name]
     return adata, train_test_index
 
