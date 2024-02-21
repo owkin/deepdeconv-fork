@@ -12,6 +12,7 @@ from benchmark_utils import (
     preprocess_scrna,
     add_cell_types_grouped,
     plot_metrics,
+    plot_mse_mae_deconv,
     plot_loss,
     plot_mixup_loss,
     plot_reconstruction_loss,
@@ -77,7 +78,10 @@ if TUNE_MIXUPVI:
         num_samples=NUM_SAMPLES,
         training_dataset=TRAINING_DATASET,
     )
-    model_history = all_results.loc[all_results.hyperparameter == best_hp] # plots for the best hp found by tuning
+    model_history = all_results.copy()
+    for variable in best_hp : 
+        # plots for the best hp found by tuning
+        model_history = model_history.loc[model_history[variable] == best_hp[variable]]
     search_space = read_search_space(search_path)
 else:
     model_path = f"project/models/{TRAINING_DATASET}_{TRAINING_CELL_TYPE_GROUP}_{N_GENES}_mixupvi.pkl"
@@ -91,23 +95,27 @@ else:
 
 
 # %% Load model / results: Uncomment if not running previous cells
-# if TUNE_MIXUPVI:
-#     path = "/home/owkin/project/mixupvi_tuning/batch_size/CTI_dataset_tune_mixupvi_2024-01-03-15:34:54"
-#     all_results = read_tuning_results(f"{path}/tuning_results.csv")
-#     search_space = read_search_space(f"{path}/search_space.pkl")
-#     best_hp = search_space["best_hp"]
-#     model_history = all_results.loc[all_results.hyperparameter == best_hp] # plots for the best hp found by tuning
-# else:
-#     import torch
-#     path = PATH
-#     model = torch.load(f"{path}/model.pt")
-#     model_history = model["attr_dict"]["history_"]
+if TUNE_MIXUPVI:
+    path = "/home/owkin/project/mixupvi_tuning/n_latent-seed/CTI_PROCESSED_dataset_tune_mixupvi_2024-02-21-11:25:28"
+    all_results = read_tuning_results(f"{path}/tuning_results.csv")
+    search_space = read_search_space(f"{path}/search_space.pkl")
+    best_hp = search_space["best_hp"]
+    model_history = all_results.copy()
+    for variable in best_hp : 
+        # plots for the best hp found by tuning
+        model_history = model_history.loc[model_history[variable] == best_hp[variable]]
+else:
+    import torch
+    model = torch.load(f"{model_path}/model.pt")
+    model_history = model["attr_dict"]["history_"]
 
 
 # %% Plots for a given model
 n_epochs = len(model_history["train_loss_epoch"])
 plot_metrics(model_history, train=True, n_epochs=n_epochs)
 plot_metrics(model_history, train=False, n_epochs=n_epochs)
+plot_mse_mae_deconv(model_history, train=True, n_epochs=n_epochs)
+plot_mse_mae_deconv(model_history, train=False, n_epochs=n_epochs)
 plot_loss(model_history, n_epochs=n_epochs)
 plot_mixup_loss(model_history, n_epochs=n_epochs)
 plot_reconstruction_loss(model_history, n_epochs=n_epochs)
@@ -117,35 +125,22 @@ plot_kl_loss(model_history, n_epochs=n_epochs)
 # %% Plots to compare HPs
 if TUNE_MIXUPVI:
     n_epochs = len(model_history["train_loss_epoch"])
-    tuned_variable = list(search_space.keys())[0]
     hp_index_to_plot = None
     # hp_index_to_plot = [1, 2, 3] # only these index (of the HPs tried) will be plotted, for clearer visualisation
-    compare_tuning_results(
-        all_results, variable_to_plot="validation_loss", variable_tuned=tuned_variable,
-        n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
-    )
-    compare_tuning_results( # latent space pearson coeff
-        all_results, variable_to_plot="pearson_coeff_validation", variable_tuned=tuned_variable,
-        n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
-    )
-    compare_tuning_results( # deconv pearson coefficient
-        all_results, variable_to_plot="pearson_coeff_deconv_validation", variable_tuned=tuned_variable,
-        n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
-    )
-    compare_tuning_results( # deconv cosine similarity
-        all_results, variable_to_plot="cosine_similarity_validation", variable_tuned=tuned_variable,
-        n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
-    )
-    compare_tuning_results(
-        all_results, variable_to_plot="mixup_penalty_validation", variable_tuned=tuned_variable,
-        n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
-    )
-    compare_tuning_results(
-        all_results, variable_to_plot="reconstruction_loss_validation", variable_tuned=tuned_variable,
-        n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
-    )
-    compare_tuning_results(
-        all_results, variable_to_plot="kl_local_validation", variable_tuned=tuned_variable,
-        n_epochs=n_epochs, hp_index_to_plot=hp_index_to_plot,
-    )
+
+    if len(best_hp) == 1 or (len(best_hp) == 2 and "seed" in best_hp):
+        tuned_variable = list(set(best_hp.keys()) - {"seed"})[0]
+        for variable_to_plot in all_results.columns:
+            if "validation" in variable_to_plot:
+                compare_tuning_results(
+                    all_results, variable_to_plot=variable_to_plot, 
+                    variable_tuned=tuned_variable, n_epochs=n_epochs, 
+                    hp_index_to_plot=hp_index_to_plot,
+                )
+    else:
+        raise NotImplementedError(
+            "For now, one can only plot tuning comparisons for one given tuned "
+            "variable, or for one given tuned variable along with different seeds."
+        )
+
 # %%

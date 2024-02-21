@@ -22,6 +22,7 @@ from .plotting_utils import (
     plot_deconv_results_group,
     plot_deconv_lineplot,
     plot_metrics,
+    plot_mse_mae_deconv,
     plot_loss,
     plot_mixup_loss,
     plot_reconstruction_loss,

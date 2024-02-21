@@ -31,6 +31,7 @@ from constants import (
     GENE_LIKELIHOOD,
     MIXUP_PENATLY_AGGREGATION,
     AVERAGE_VARIABLES_MIXUP_PENALTY,
+    SEED,
 )
 
 def tune_mixupvi(adata: ad.AnnData,
@@ -63,7 +64,7 @@ def tune_mixupvi(adata: ad.AnnData,
     )
 
     all_results, best_hp, tuning_path, search_path = format_and_save_tuning_results(
-        tuning_results, variable=TUNED_VARIABLES[0], training_dataset=training_dataset,
+        tuning_results, variables=TUNED_VARIABLES, training_dataset=training_dataset,
     )
 
     return all_results, best_hp, tuning_path, search_path
@@ -86,6 +87,7 @@ def fit_mixupvi(adata: ad.AnnData,
             )
             mixupvi_model = scvi.model.MixUpVI(
                 adata,
+                seed=SEED,
                 n_pseudobulks=N_PSEUDOBULKS,
                 n_cells_per_pseudobulk=N_CELLS_PER_PSEUDOBULK,
                 n_latent=LATENT_SIZE,

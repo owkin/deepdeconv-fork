@@ -1,7 +1,7 @@
 """Constants and global variables to run the different deconv files."""
 
 ## constants for run_mixupvi.py
-TUNE_MIXUPVI = False
+TUNE_MIXUPVI = True
 TRAINING_DATASET = "CTI_PROCESSED"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_CELL_TYPE_GROUP = (
     "updated_granular_groups"  # ["primary_groups", "precise_groups", "updated_granular_groups"]
@@ -24,10 +24,11 @@ BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
 
 ## general mixupvi constants when training it or preprocessing data
 SAVE_MODEL = False
+SEED = 0
 N_GENES = 3000 # number of input genes after preprocessing
 # MixUpVI training hyperparameters
-MAX_EPOCHS = 100
-BATCH_SIZE = 4092
+MAX_EPOCHS = 10
+BATCH_SIZE = 2048
 TRAIN_SIZE = 0.7 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
@@ -36,9 +37,9 @@ if TRAIN_SIZE < 1:
 N_PSEUDOBULKS = 1
 N_CELLS_PER_PSEUDOBULK = None # None (then will be batch size) or int (will cap at batch size)
 LATENT_SIZE = 30
-CONT_COV = ["_scvi_labels"]  # list of continuous covariates to include
-CAT_COV = ["donor_id", "assay"] # ["donor_id", "assay"]
-ENCODE_COVARIATES = True # whether to encode cont/cat covars (they are always decoded)
+CONT_COV = None  # None or list of continuous covariates to include
+CAT_COV = None # None or ["donor_id", "assay"]
+ENCODE_COVARIATES = False # whether to encode cont/cat covars (they are always decoded)
 LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
 PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
 SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]

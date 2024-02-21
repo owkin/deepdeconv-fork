@@ -146,6 +146,7 @@ class MixUpVAE(VAE):
         n_hidden: Tunable[int] = 128,
         n_latent: Tunable[int] = 10,
         n_layers: Tunable[int] = 1,
+        seed: Tunable[int] = 0,
         n_continuous_cov: int = 0,
         n_cats_per_cov: Optional[Iterable[int]] = None,
         dropout_rate: Tunable[float] = 0.1,
@@ -176,6 +177,8 @@ class MixUpVAE(VAE):
         mixup_penalty_aggregation: Tunable[str] = "mean",
         average_variables_mixup_penalty: Tunable[bool] = False,
     ):
+        torch.manual_seed(seed)
+
         super().__init__(
             n_input=n_input,
             n_batch=n_batch,
@@ -312,18 +315,7 @@ class MixUpVAE(VAE):
         x_ = x
 
         # create self.n_pseudobulks
-        if self.n_cells_per_pseudobulk is None:
-            n_cells_per_pseudobulk = x_.shape[0]
-        elif self.n_cells_per_pseudobulk > x_.shape[0]:
-            message = (
-            "n_cells_per_pseudobulk is larger than batch size. Redefining it to be "
-            "equal to batch size."
-            )
-            if message not in self.logger_messages:
-                # we only show it if larger than batch size (last batch of an epoch is
-                # usually smaller, we don't trigger a warning for this case).
-                logger.warn(message)
-            self.logger_messages.add(message)
+        if self.n_cells_per_pseudobulk is None or self.n_cells_per_pseudobulk > x_.shape[0] :
             n_cells_per_pseudobulk = x_.shape[0]
         else:
             n_cells_per_pseudobulk = self.n_cells_per_pseudobulk
@@ -371,6 +363,7 @@ class MixUpVAE(VAE):
             encoder_signature_input = torch.cat((x_signature_, cont_covs_signature), dim=-1)
         else:
             encoder_input = x_
+            cont_covs_pseudobulk = ()
             encoder_pseudobulk_input = x_pseudobulk_
             encoder_signature_input = x_signature_
         if cat_covs is not None and self.encode_covariates:
@@ -393,7 +386,7 @@ class MixUpVAE(VAE):
             categorical_input = ()
             categorical_pseudobulk_input = ()
             categorical_signature_input = ()
-        one_hot_batch_index = one_hot(batch_index, self.n_labels)
+        one_hot_batch_index = one_hot(batch_index, self.n_batch)
         one_hot_batch_index_pseudobulk = one_hot_batch_index[pseudobulk_indices, :].mean(axis=1)
 
         # regular encoding
