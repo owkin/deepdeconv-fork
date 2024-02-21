@@ -95,19 +95,19 @@ else:
 
 
 # %% Load model / results: Uncomment if not running previous cells
-if TUNE_MIXUPVI:
-    path = "/home/owkin/project/mixupvi_tuning/n_latent-seed/CTI_PROCESSED_dataset_tune_mixupvi_2024-02-21-11:25:28"
-    all_results = read_tuning_results(f"{path}/tuning_results.csv")
-    search_space = read_search_space(f"{path}/search_space.pkl")
-    best_hp = search_space["best_hp"]
-    model_history = all_results.copy()
-    for variable in best_hp : 
-        # plots for the best hp found by tuning
-        model_history = model_history.loc[model_history[variable] == best_hp[variable]]
-else:
-    import torch
-    model = torch.load(f"{model_path}/model.pt")
-    model_history = model["attr_dict"]["history_"]
+# if TUNE_MIXUPVI:
+#     path = "/home/owkin/project/mixupvi_tuning/n_latent-seed/CTI_PROCESSED_dataset_tune_mixupvi_2024-02-21-11:25:28"
+#     all_results = read_tuning_results(f"{path}/tuning_results.csv")
+#     search_space = read_search_space(f"{path}/search_space.pkl")
+#     best_hp = search_space["best_hp"]
+#     model_history = all_results.copy()
+#     for variable in best_hp : 
+#         # plots for the best hp found by tuning
+#         model_history = model_history.loc[model_history[variable] == best_hp[variable]]
+# else:
+#     import torch
+#     model = torch.load(f"{model_path}/model.pt")
+#     model_history = model["attr_dict"]["history_"]
 
 
 # %% Plots for a given model
