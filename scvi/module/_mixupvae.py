@@ -346,8 +346,8 @@ class MixUpVAE(VAE):
                     # if n_cat == 0 then no batch index was given, so skip it
                     one_hot_cat_covs = one_hot(cat_covs[j], n_cat)
                     categorical_input.append(one_hot_cat_covs)
-                    ont_hot_cat_covs_pure = one_hot_cat_covs.mean(axis=0).resize(1,n_cat)
-                    categorical_pseudobulk_input.append(ont_hot_cat_covs_pure)
+                    one_hot_cat_covs_pseudobulk = one_hot_cat_covs.mean(axis=0).resize(1,n_cat)
+                    categorical_pseudobulk_input.append(one_hot_cat_covs_pseudobulk)
                     categorical_signature_input_temp = []
                     for cell_type in unique_indices:
                         idx = (y == cell_type).flatten()
