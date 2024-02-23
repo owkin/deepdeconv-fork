@@ -25,7 +25,7 @@ def format_and_save_tuning_results(tuning_results, variables: str, training_data
                         results[key].append(np.nan)
         results = pd.DataFrame(results)
         
-        hyperparameters = path.split("/")[6]
+        hyperparameters = path.split("/")[-1]
         for i, variable in enumerate(variables):
             hyperparameters=hyperparameters.split(f"{variable}=")[1]
             if i < len(variables)-1:
