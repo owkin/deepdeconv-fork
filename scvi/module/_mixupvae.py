@@ -355,8 +355,8 @@ class MixUpVAE(VAE):
                         categorical_signature_input_temp.append(one_hot_cat_covs_pure)
                     categorical_signature_input.append(torch.stack(categorical_signature_input_temp))
                     j+=1
-            categorical_input_bis = copy.copy(categorical_input)
-            categorical_pseudobulk_input_bis = copy.copy(categorical_pseudobulk_input)
+            categorical_input_bis = copy.deepcopy(categorical_input)
+            categorical_pseudobulk_input_bis = copy.deepcopy(categorical_pseudobulk_input)
 
         # Encode covariates
         if not self.encode_covariates:
