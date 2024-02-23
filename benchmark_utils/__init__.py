@@ -9,6 +9,7 @@ from .deconv_utils import (
 from .dataset_utils import (
     preprocess_scrna,
     split_dataset,
+    create_new_granularity_index,
     add_cell_types_grouped,
     create_purified_pseudobulk_dataset,
     create_uniform_pseudobulk_dataset,
