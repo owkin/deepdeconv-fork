@@ -17,7 +17,7 @@ elif SIGNATURE_CHOICE == "CTI_3rd_level_granularity":
     BENCHMARK_CELL_TYPE_GROUP = "3rd_level_granularity"
 elif SIGNATURE_CHOICE == "CTI_4th_level_granularity":
     BENCHMARK_CELL_TYPE_GROUP = "4th_level_granularity"
-elif SIGNATURE_CHOICE == "CTI_4th_level_granularity":
+elif SIGNATURE_CHOICE == "FACS_1st_level_granularity":
     BENCHMARK_CELL_TYPE_GROUP = "FACS_1st_level_granularity"
 else:
     BENCHMARK_CELL_TYPE_GROUP = None # no signature was created
