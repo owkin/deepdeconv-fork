@@ -19,7 +19,9 @@ from scvi.nn import Encoder
 from ._vae import VAE
 from ._utils import (
     run_incompatible_value_checks,
-    get_mean_pearsonr_torch
+    get_mean_pearsonr_torch,
+    compute_ground_truth_proportions,
+    compute_signature,
 )
 
 # for deconvolution
@@ -327,27 +329,12 @@ class MixUpVAE(VAE):
             replace = True,
         )
         x_pseudobulk_ = x_[pseudobulk_indices, :].mean(axis=1)
+        y_pseudobulk = y[pseudobulk_indices, :].squeeze(axis=2)
 
-        y_ = y[pseudobulk_indices, :].squeeze(axis=2)
-        all_proportions = []
-        for ground_truth in y_:
-            unique_indices, counts = ground_truth.unique(return_counts=True)
-            if len(counts) < self.n_labels:
-                # then not all labels are present in pseudobulk, but we need to specify these proportions of 0
-                unique_indices = unique_indices.int().tolist()
-                counts =  [counts[unique_indices.index(j)].item() if j in unique_indices else 0 for j in range(self.n_labels)]
-                counts = torch.tensor(counts).to(device="cuda")
-            proportions = counts.float() / n_cells_per_pseudobulk
-            all_proportions.append(proportions)
-        
-        # create training signature
-        x_signature_mask = []
-        unique_indices, counts = y.unique(return_counts=True)
-        for cell_type in unique_indices:
-            idx = (y == cell_type).flatten()
-            x_signature_mask.append(idx.tolist())
-        x_signature_mask = torch.Tensor(x_signature_mask).to(device="cuda")
-        x_signature_ = torch.matmul(x_signature_mask, x_)/counts.unsqueeze(-1)
+        all_proportions = compute_ground_truth_proportions(
+            y_pseudobulk, self.n_labels, n_cells_per_pseudobulk
+        )
+        counts, x_signature_mask, x_signature_ = compute_signature(y, x_)
 
         # library size
         if self.use_observed_lib_size:
@@ -469,7 +456,6 @@ class MixUpVAE(VAE):
             "library_pseudobulk": library_pseudobulk,
             "categorical_pseudobulk_input": categorical_pseudobulk_input_copy,
             # pure cell type signature encodings
-            "proportions": proportions,
             "z_signature": z_signature,
         }
 

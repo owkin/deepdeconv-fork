@@ -81,6 +81,33 @@ def create_random_proportion(
     return np.random.permutation(proportion_vector)
 
 
+def compute_ground_truth_proportions(y_pseudobulk, n_labels, n_cells_per_pseudobulk):
+    """Compute the ground truth cell type proportions for each pseudobulk of the batch."""
+    all_proportions = []
+    for ground_truth in y_pseudobulk:
+        unique_indices, counts = ground_truth.unique(return_counts=True)
+        if len(counts) < n_labels:
+            # then not all labels are present in pseudobulk, but we need to specify these proportions of 0
+            unique_indices = unique_indices.int().tolist()
+            counts =  [counts[unique_indices.index(j)].item() if j in unique_indices else 0 for j in range(n_labels)]
+            counts = torch.tensor(counts).to(device="cuda")
+        proportions = counts.float() / n_cells_per_pseudobulk
+        all_proportions.append(proportions)
+    return all_proportions
+
+
+def compute_signature(y, x_):
+    """Compute the signature matrix and signature matrix mask of the batch."""
+    x_signature_mask = []
+    unique_indices, counts = y.unique(return_counts=True)
+    for cell_type in unique_indices:
+        idx = (y == cell_type).flatten()
+        x_signature_mask.append(idx.tolist())
+    x_signature_mask = torch.Tensor(x_signature_mask).to(device="cuda")
+    x_signature_ = torch.matmul(x_signature_mask, x_)/counts.unsqueeze(-1)
+    return counts, x_signature_mask, x_signature_
+
+
 def get_mean_pearsonr_torch(x, y):
     """
     Mimics `scipy.stats.pearsonr`
