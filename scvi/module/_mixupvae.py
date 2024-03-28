@@ -1,6 +1,7 @@
 """Main module."""
 import logging
 from typing import Callable, Iterable, Literal, Optional
+import copy
 
 import numpy as np
 import torch
@@ -348,6 +349,7 @@ class MixUpVAE(VAE):
         x_signature_mask = torch.Tensor(x_signature_mask).to(device="cuda")
         x_signature_ = torch.matmul(x_signature_mask, x_)/counts.unsqueeze(-1)
 
+        # library size
         if self.use_observed_lib_size:
             library = torch.log(x.sum(axis=1)).unsqueeze(1)
             library_pseudobulk = torch.log(x_pseudobulk_.sum(axis=1)).unsqueeze(1)
@@ -355,7 +357,10 @@ class MixUpVAE(VAE):
             x_ = torch.log(1 + x_)
             x_pseudobulk_ = torch.log(1 + x_pseudobulk_)
             x_signature_ = torch.log(1 + x_signature_)
-        if cont_covs is not None and self.encode_covariates:
+
+        # continuous covariates
+        if cont_covs is not None:
+            # for single-cell and pseudobulk
             encoder_input = torch.cat((x_, cont_covs), dim=-1)
             cont_covs_pseudobulk = cont_covs[pseudobulk_indices, :].mean(axis=1)
             encoder_pseudobulk_input = torch.cat((x_pseudobulk_, cont_covs_pseudobulk), dim=-1)
@@ -366,7 +371,9 @@ class MixUpVAE(VAE):
             cont_covs_pseudobulk = ()
             encoder_pseudobulk_input = x_pseudobulk_
             encoder_signature_input = x_signature_
-        if cat_covs is not None and self.encode_covariates:
+
+        # categorical covariates
+        if cat_covs is not None:
             cat_covs = torch.split(cat_covs, 1, dim=1)
             categorical_input = []
             categorical_pseudobulk_input = []
@@ -377,15 +384,21 @@ class MixUpVAE(VAE):
                     # if n_cat == 0 then no batch index was given, so skip it
                     one_hot_cat_covs = one_hot(cat_covs[j], n_cat)
                     categorical_input.append(one_hot_cat_covs)
-                    one_hot_cat_covs_pure = one_hot_cat_covs[pseudobulk_indices, :].mean(axis=1)
-                    categorical_pseudobulk_input.append(one_hot_cat_covs_pure)
+                    one_hot_cat_covs_pseudobulk = one_hot_cat_covs[pseudobulk_indices, :].mean(axis=1)
+                    categorical_pseudobulk_input.append(one_hot_cat_covs_pseudobulk)
                     one_hot_cat_covs_signature = torch.matmul(x_signature_mask, one_hot_cat_covs)/counts.unsqueeze(-1)
                     categorical_signature_input.append(one_hot_cat_covs_signature)
                     j+=1
-        else:
+            categorical_input_copy = copy.deepcopy(categorical_input)
+            categorical_pseudobulk_input_copy = copy.deepcopy(categorical_pseudobulk_input)
+
+        # Encode covariates
+        if not self.encode_covariates:
+            # don't enconde categorical covariates but return copy in inference outputs
             categorical_input = ()
             categorical_pseudobulk_input = ()
             categorical_signature_input = ()
+        
         one_hot_batch_index = one_hot(batch_index, self.n_batch)
         one_hot_batch_index_pseudobulk = one_hot_batch_index[pseudobulk_indices, :].mean(axis=1)
 
@@ -447,17 +460,17 @@ class MixUpVAE(VAE):
             "qz": qz,
             "ql": ql,
             "library": library,
-            "categorical_input": categorical_input,
-            "one_hot_batch_index": one_hot_batch_index,
+            "categorical_input": categorical_input_copy,
             # pseudobulk encodings
             "pseudobulk_indices": pseudobulk_indices,
             "z_pseudobulk": z_pseudobulk,
             "qz_pseudobulk": qz_pseudobulk,
             "ql_pseudobulk": ql_pseudobulk,
             "library_pseudobulk": library_pseudobulk,
-            "cont_covs_pseudobulk": cont_covs_pseudobulk,
-            "categorical_pseudobulk_input": categorical_pseudobulk_input,
-            "one_hot_batch_index_pseudobulk": one_hot_batch_index_pseudobulk,
+            "categorical_pseudobulk_input": categorical_pseudobulk_input_copy,
+            # pure cell type signature encodings
+            "proportions": proportions,
+            "z_signature": z_signature,
         }
 
         return outputs
