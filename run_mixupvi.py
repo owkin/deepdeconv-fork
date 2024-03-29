@@ -88,10 +88,10 @@ else:
         adata_train,
         model_path=model_path,
         cell_type_group=cell_type,
-        save_model=False,#SAVE_MODEL,
+        save_model=SAVE_MODEL,
         cat_cov=CAT_COV,
         cont_cov=CONT_COV,
-        encode_covariates=False,#ENCODE_COVARIATES,
+        encode_covariates=ENCODE_COVARIATES,
     )
     model_history = model.history
 
