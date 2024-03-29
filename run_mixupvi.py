@@ -28,6 +28,9 @@ from constants import (
     N_GENES,
     TRAINING_DATASET,
     TRAINING_CELL_TYPE_GROUP,
+    CAT_COV,
+    CONT_COV,
+    ENCODE_COVARIATES,
 )
 from tuning_configs import (
     SEARCH_SPACE, NUM_SAMPLES, METRIC, ADDITIONAL_METRICS,
@@ -89,7 +92,10 @@ else:
         adata_train,
         model_path=model_path,
         cell_type_group=cell_type,
-        save_model=SAVE_MODEL
+        save_model=SAVE_MODEL,
+        cat_cov=CAT_COV,
+        cont_cov=CONT_COV,
+        encode_covariates=ENCODE_COVARIATES,
     )
     model_history = model.history
 

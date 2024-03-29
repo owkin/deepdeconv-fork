@@ -62,7 +62,7 @@ def split_dataset(
 def create_new_granularity_index(grouping_choice = "2nd_level_granularity"):
     """Create new granularity index file used to create signature matrices."""
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
-    groups = GROUPS[grouping_choice] 
+    groups = GROUPS[grouping_choice]
     group_correspondence = {}
     for k, v in groups.items():
         for cell_type in v:
@@ -272,10 +272,17 @@ def create_dirichlet_pseudobulk_dataset(
     for i in range(n_sample):
         sample_data = []
         for j, cell_type in enumerate(likelihood_alphas.index):
-            cell_sample = random.sample(
-                list(adata.obs.loc[adata.obs.cell_types_grouped == cell_type].index),
-                posterior_dirichlet[i][j],
-            )
+            # If sample larger than cell population, sample with replacement
+            if posterior_dirichlet[i][j] > cell_types[cell_type]:
+                cell_sample = random.choices(
+                    list(adata.obs.loc[adata.obs.cell_types_grouped == cell_type].index),
+                    k=posterior_dirichlet[i][j],
+                )
+            else:
+                cell_sample = random.sample(
+                    list(adata.obs.loc[adata.obs.cell_types_grouped == cell_type].index),
+                    posterior_dirichlet[i][j],
+                )
             sample_data.extend(cell_sample)
         adata_sample = adata[sample_data]
         if aggregation_method == "mean":
