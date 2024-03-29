@@ -82,7 +82,7 @@ class MixUpVAE(VAE):
     n_pseudobulks
         Number of pseudobulks to create (i.e. number of MixUp losses to compute and average).
     n_cells_per_pseudobulk
-        Number of cells to sample to create a pseudobulk sample. If None, the number 
+        Number of cells to sample to create a pseudobulk sample. If None, the number
         of cells is equal to the batch size.
     signature_type
         One of
@@ -104,7 +104,7 @@ class MixUpVAE(VAE):
     mixup_penalty
         The loss to use to compare the average of encoded cell and the encoded pseudobulk.
     mixup_penalty_aggregation
-        One of 
+        One of
 
         * ``'sum'`` - Sum the n_pseudobulk L2 losses
         * ``'mean'`` - Average the n_pseudobulk L2 losses
@@ -215,7 +215,7 @@ class MixUpVAE(VAE):
             mixup_penalty=mixup_penalty,
             gene_likelihood=gene_likelihood,
         )
-        
+
         self.n_pseudobulks = n_pseudobulks
         self.n_cells_per_pseudobulk = n_cells_per_pseudobulk
         self.signature_type = signature_type
@@ -388,7 +388,7 @@ class MixUpVAE(VAE):
             categorical_input = ()
             categorical_pseudobulk_input = ()
             categorical_signature_input = ()
-        
+
         one_hot_batch_index = one_hot(batch_index, self.n_batch)
         one_hot_batch_index_pseudobulk = one_hot_batch_index[pseudobulk_indices, :].mean(axis=1)
 
@@ -471,54 +471,29 @@ class MixUpVAE(VAE):
     def generative(
         self,
         z,
-        z_pseudobulk,
         library,
-        library_pseudobulk,
         one_hot_batch_index,
-        one_hot_batch_index_pseudobulk,
         cont_covs=None,
-        cont_covs_pseudobulk=None,
         categorical_input=(),
-        categorical_pseudobulk_input=(),
-        pseudobulk_indices=(),
         size_factor=None,
         y=None,
         transform_batch=None,
     ):
         """Runs the generative model."""
-        if self.pseudo_bulk == "post_inference":
-            # create it from z by overwritting the one coming from inference
-            z_pseudobulk = z[pseudobulk_indices, :].mean(axis=1)
-
         if cont_covs is None:
             decoder_input = z
-            decoder_pseudobulk_input = z_pseudobulk
         elif z.dim() != cont_covs.dim():
             decoder_input = torch.cat(
                 [z, cont_covs.unsqueeze(0).expand(z.size(0), -1, -1)], dim=-1
             )
-            decoder_pseudobulk_input = torch.cat(
-                [
-                    z_pseudobulk,
-                    cont_covs_pseudobulk.unsqueeze(0)
-                    .expand(z_pseudobulk.size(0), -1, -1)
-                ],
-                dim=-1,
-            )
         else:
             decoder_input = torch.cat([z, cont_covs], dim=-1)
-            decoder_pseudobulk_input = torch.cat(
-                [z_pseudobulk, cont_covs_pseudobulk], dim=-1
-            )
-            
 
         if transform_batch is not None:
             batch_index = torch.ones_like(batch_index) * transform_batch
 
-        size_factor_pseudobulk = None
         if not self.use_size_factor_key:
             size_factor = library
-            size_factor_pseudobulk = library_pseudobulk
 
         one_hot_y = one_hot(y, self.n_labels)
         px_scale, px_r, px_rate, px_dropout = self.decoder(
@@ -529,6 +504,98 @@ class MixUpVAE(VAE):
             *categorical_input,
             one_hot_y,
         )
+
+        if self.dispersion == "gene-label":
+            px_r = F.linear(
+                one_hot_y, self.px_r
+            )  # px_r gets transposed - last dimension is nb genes
+        elif self.dispersion == "gene-batch":
+            px_r = F.linear(one_hot(batch_index, self.n_batch), self.px_r)
+            px_pseudobulk_r = F.linear(one_hot(batch_index, self.n_batch), self.px_r)
+        elif self.dispersion == "gene":
+            px_r = self.px_r
+            px_pseudobulk_r = self.px_r
+
+        px_r = torch.exp(px_r)
+
+        if self.gene_likelihood == "zinb":
+            px = ZeroInflatedNegativeBinomial(
+                mu=px_rate,
+                theta=px_r,
+                zi_logits=px_dropout,
+                scale=px_scale,
+            )
+        elif self.gene_likelihood == "nb":
+            px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
+        elif self.gene_likelihood == "poisson":
+            px = Poisson(px_rate, scale=px_scale)
+
+        # Priors
+        if self.use_observed_lib_size:
+            pl = None
+        elif self.n_batch > 1:
+            raise ValueError(
+                "Not using observed library size while having more than one batch does "
+                "not make sense for the nature of pseudobulk."
+            )
+        else:
+            (
+                local_library_log_means,
+                local_library_log_vars,
+            ) = self._compute_local_library_params(batch_index)
+            pl = Normal(local_library_log_means, local_library_log_vars.sqrt())
+        pz = Normal(torch.zeros_like(z), torch.ones_like(z))
+
+        return {
+            "px": px,
+            "pl": pl,
+            "pz": pz,
+        }
+
+    @auto_move_data
+    def generative_pseudobulk(
+        self,
+        z,
+        z_pseudobulk,
+        library_pseudobulk,
+        one_hot_batch_index_pseudobulk,
+        cont_covs_pseudobulk=None,
+        categorical_pseudobulk_input=(),
+        pseudobulk_indices=(),
+        size_factor=None,
+        y_pseudobulk=None,
+        transform_batch=None,
+    ):
+        """Runs the generative model for the pseudobulk."""
+        if self.pseudo_bulk == "post_inference":
+            # create it from z by overwritting the one coming from inference
+            z_pseudobulk = z[pseudobulk_indices, :].mean(axis=1)
+
+        if cont_covs_pseudobulk is None:
+            decoder_pseudobulk_input = z_pseudobulk
+        elif z.dim() != cont_covs_pseudobulk.dim():
+            decoder_pseudobulk_input = torch.cat(
+                [
+                    z_pseudobulk,
+                    cont_covs_pseudobulk.unsqueeze(0)
+                    .expand(z_pseudobulk.size(0), -1, -1)
+                ],
+                dim=-1,
+            )
+        else:
+            decoder_pseudobulk_input = torch.cat(
+                [z_pseudobulk, cont_covs_pseudobulk], dim=-1
+            )
+
+        if transform_batch is not None:
+            batch_index = torch.ones_like(batch_index) * transform_batch
+
+        size_factor_pseudobulk = None
+        if not self.use_size_factor_key:
+            size_factor_pseudobulk = library_pseudobulk
+
+        one_hot_y = one_hot(y, self.n_labels)
+
         one_hot_y_pseudobulk = one_hot_y[pseudobulk_indices, :].mean(axis=1)
         (
             px_pseudobulk_scale,
@@ -544,9 +611,6 @@ class MixUpVAE(VAE):
             one_hot_y_pseudobulk,
         )
         if self.dispersion == "gene-label":
-            px_r = F.linear(
-                one_hot_y, self.px_r
-            )  # px_r gets transposed - last dimension is nb genes
             px_pseudobulk_r = F.linear(
                 one_hot_y_pseudobulk, self.px_r
             )  # should we really create self.px_pseudobulk_r ?
@@ -561,22 +625,21 @@ class MixUpVAE(VAE):
         px_pseudobulk_r = torch.exp(px_pseudobulk_r)
 
         if self.gene_likelihood == "zinb":
-            px = ZeroInflatedNegativeBinomial(
-                mu=px_rate,
-                theta=px_r,
-                zi_logits=px_dropout,
-                scale=px_scale,
+            px_pseudobulk = ZeroInflatedNegativeBinomial(
+                mu=px_pseudobulk_rate,
+                theta=px_pseudobulk_r,
+                zi_logits=px_pseudobulk_dropout,
+                scale=px_pseudobulk_scale,
             )
         elif self.gene_likelihood == "nb":
-            px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
+            px_pseudobulk = NegativeBinomial(mu=px_pseudobulk_rate,
+                                             theta=px_pseudobulk_r,
+                                             scale=px_pseudobulk_scale)
         elif self.gene_likelihood == "poisson":
-            px = Poisson(px_rate, scale=px_scale)
-        px_pseudobulk = NegativeBinomial(
-            mu=px_pseudobulk_rate, theta=px_pseudobulk_r, scale=px_pseudobulk_scale
-        )
+            px_pseudobulk = Poisson(px_pseudobulk_rate,
+                                    scale=px_pseudobulk_scale)
         # Priors
         if self.use_observed_lib_size:
-            pl = None
             pl_pseudobulk = None
         elif self.n_batch > 1:
             raise ValueError(
@@ -585,31 +648,23 @@ class MixUpVAE(VAE):
             )
         else:
             (
-                local_library_log_means,
-                local_library_log_vars,
-            ) = self._compute_local_library_params(batch_index)
-            (
                 local_library_log_means_pseudobulk,
                 local_library_log_vars_pseudobulk,
             ) = self._compute_local_library_params(batch_index[0].unsqueeze(0))
-            pl = Normal(local_library_log_means, local_library_log_vars.sqrt())
             pl_pseudobulk = Normal(
                 local_library_log_means_pseudobulk,
                 local_library_log_vars_pseudobulk.sqrt(),
             )
-        pz = Normal(torch.zeros_like(z), torch.ones_like(z))
         pz_pseudobulk = Normal(
             torch.zeros_like(z_pseudobulk), torch.ones_like(z_pseudobulk)
         )
         return {
-            "px": px,
-            "pl": pl,
-            "pz": pz,
             # pseudobulk decodings
             "px_pseudobulk": px_pseudobulk,
             "pl_pseudobulk": pl_pseudobulk,
             "pz_pseudobulk": pz_pseudobulk,
         }
+
 
     def loss(
         self,
@@ -680,7 +735,7 @@ class MixUpVAE(VAE):
         cosine_similarity = sum(cosine_deconv_results)/len(cosine_deconv_results)
         mse_deconv = sum(mse_deconv_results)/len(mse_deconv_results)
         mae_deconv = sum(mae_deconv_results)/len(mae_deconv_results)
-        
+
 
         # logging
         kl_local = {
