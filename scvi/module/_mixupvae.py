@@ -334,27 +334,14 @@ class MixUpVAE(VAE):
             encoder_pseudobulk_input = x_pseudobulk_
             encoder_signature_input = x_signature_
 
-        ## Intialize empty tuples for categorical covariates
-        # Categorical covariates for output dict
-        categorical_input = ()
-        categorical_pseudobulk_input = ()
-        categorical_signature_input = ()
-        # Categorical covariates for encoder
-        categorical_input_encoder = ()
-        categorical_pseudobulk_input_encoder = ()
-        categorical_signature_input_encoder = ()
-
-        # /!\ Categorical covariates should *always* be returned for the decoder
+        # categorical covariates
         if cat_covs is not None:
             cat_covs = torch.split(cat_covs, 1, dim=1)
             categorical_input = []
             categorical_pseudobulk_input = []
             categorical_signature_input = []
             j=0
-            # Use the decoder's `n_cat_list` arg to determine the number
-            # of categories. The encoder's `n_cat_list` will be set to `None` if
-            # `self.encoder.encode_covariates`` is set to `False``
-            for n_cat in self.decoder.px_decoder.n_cat_list:
+            for n_cat in self.z_encoder.encoder.n_cat_list:
                 if n_cat > 0 :
                     # if n_cat == 0 then no batch index was given, so skip it
                     one_hot_cat_covs = one_hot(cat_covs[j], n_cat)
@@ -368,30 +355,33 @@ class MixUpVAE(VAE):
                         categorical_signature_input_temp.append(one_hot_cat_covs_pure)
                     categorical_signature_input.append(torch.stack(categorical_signature_input_temp))
                     j+=1
-            if self.encode_covariates:
-                categorical_input_encoder = copy.deepcopy(categorical_input)
-                categorical_pseudobulk_input_encoder = copy.deepcopy(categorical_pseudobulk_input)
-                categorical_signature_input_encoder = copy.deepcopy(categorical_signature_input)
+            categorical_input_bis = copy.deepcopy(categorical_input)
+            categorical_pseudobulk_input_bis = copy.deepcopy(categorical_pseudobulk_input)
 
+        # Encode covariates
+        if not self.encode_covariates:
+            categorical_input = ()
+            categorical_pseudobulk_input = ()
+            categorical_signature_input = ()
 
         # regular encoding
         qz, z = self.z_encoder(
             encoder_input,
             batch_index,
-            *categorical_input_encoder,
+            *categorical_input,
         )
         # pseudobulk encoding
         qz_pseudobulk, z_pseudobulk = self.z_encoder(
             encoder_pseudobulk_input,
             batch_index,
-            *categorical_pseudobulk_input_encoder,
+            *categorical_pseudobulk_input,
         )
         # pure cell type signature encoding
         if self.signature_type == "pre_encoded":
             _, z_signature = self.z_encoder(
                 encoder_signature_input,
                 batch_index,
-                *categorical_signature_input_encoder,
+                *categorical_signature_input,
             )
         elif self.signature_type == "post_inference":
             # create signature matrix - inside the latent space
@@ -438,13 +428,13 @@ class MixUpVAE(VAE):
             "qz": qz,
             "ql": ql,
             "library": library,
-            "categorical_input": categorical_input,
+            "categorical_input": categorical_input_bis,
             # pseudobulk encodings
             "z_pseudobulk": z_pseudobulk,
             "qz_pseudobulk": qz_pseudobulk,
             "ql_pseudobulk": ql_pseudobulk,
             "library_pseudobulk": library_pseudobulk,
-            "categorical_pseudobulk_input": categorical_pseudobulk_input,
+            "categorical_pseudobulk_input": categorical_pseudobulk_input_bis,
             # pure cell type signature encodings
             "proportions": proportions,
             "z_signature": z_signature,
