@@ -19,7 +19,9 @@ from scvi.nn import Encoder
 from ._vae import VAE
 from ._utils import (
     run_incompatible_value_checks,
-    get_pearsonr_torch
+    get_mean_pearsonr_torch,
+    compute_ground_truth_proportions,
+    compute_signature,
 )
 
 # for deconvolution
@@ -55,9 +57,6 @@ class MixUpVAE(VAE):
         Number of continuous covarites
     n_cats_per_cov
         Number of categories for each extra categorical covariate
-    n_cell_types
-        Number of cell types for this granularity. We don't compute it inside a forward
-        pass, as it can vary from batch to batch.
     dropout_rate
         Dropout rate for neural networks
     dispersion
@@ -80,6 +79,11 @@ class MixUpVAE(VAE):
 
         * ``'normal'`` - Isotropic normal
         * ``'ln'`` - Logistic normal with normal params N(0, 1)
+    n_pseudobulks
+        Number of pseudobulks to create (i.e. number of MixUp losses to compute and average).
+    n_cells_per_pseudobulk
+        Number of cells to sample to create a pseudobulk sample. If None, the number 
+        of cells is equal to the batch size.
     signature_type
         One of
 
@@ -90,7 +94,6 @@ class MixUpVAE(VAE):
 
         * ``'latent_space'`` - Compute the MixUp loss in the latent space.
         * ``'reconstructed_space'`` - Compute the MixUp loss in the reconstructed space.
-        * ``'both'`` - Compute the MixUp loss in both latent and reconstructed space and sum them.
     pseudo_bulk
         One of
 
@@ -100,6 +103,16 @@ class MixUpVAE(VAE):
         Whether to concatenate covariates to expression in encoder
     mixup_penalty
         The loss to use to compare the average of encoded cell and the encoded pseudobulk.
+    mixup_penalty_aggregation
+        One of 
+
+        * ``'sum'`` - Sum the n_pseudobulk L2 losses
+        * ``'mean'`` - Average the n_pseudobulk L2 losses
+        * ``'max'`` - Take the max among the n_pseudobulk L2 losses
+    average_variables_mixup_penalty
+        Whether to average the mixup penalty across the different variables. When False, the values are just summed.
+        If the loss_computation is in the latent space, there are n_latent variables.
+        If inside the reconstructed space, there are n_input variables.
     deeply_inject_covariates
         Whether to concatenate covariates into output of hidden layers in encoder/decoder. This option
         only applies when `n_layers` > 1. The covariates are concatenated to the input of subsequent hidden layers.
@@ -136,9 +149,9 @@ class MixUpVAE(VAE):
         n_hidden: Tunable[int] = 128,
         n_latent: Tunable[int] = 10,
         n_layers: Tunable[int] = 1,
+        seed: Tunable[int] = 0,
         n_continuous_cov: int = 0,
         n_cats_per_cov: Optional[Iterable[int]] = None,
-        n_cell_types: int = 5,
         dropout_rate: Tunable[float] = 0.1,
         dispersion: Tunable[
             Literal["gene", "gene-batch", "gene-label", "gene-cell"]
@@ -158,11 +171,17 @@ class MixUpVAE(VAE):
         extra_encoder_kwargs: Optional[dict] = None,
         extra_decoder_kwargs: Optional[dict] = None,
         # MixUpVAE specific arguments
+        n_pseudobulks: Tunable[int] = 1,
+        n_cells_per_pseudobulk: Tunable[Optional[int]] = None,
         signature_type: Tunable[str] = "pre_encoded",
         loss_computation: Tunable[str] = "latent_space",
         pseudo_bulk: Tunable[str] = "pre_encoded",
         mixup_penalty: Tunable[str] = "l2",
+        mixup_penalty_aggregation: Tunable[str] = "mean",
+        average_variables_mixup_penalty: Tunable[bool] = False,
     ):
+        torch.manual_seed(seed)
+
         super().__init__(
             n_input=n_input,
             n_batch=n_batch,
@@ -196,14 +215,17 @@ class MixUpVAE(VAE):
             mixup_penalty=mixup_penalty,
             gene_likelihood=gene_likelihood,
         )
-
-        self.n_cell_types = n_cell_types
+        
+        self.n_pseudobulks = n_pseudobulks
+        self.n_cells_per_pseudobulk = n_cells_per_pseudobulk
         self.signature_type = signature_type
         self.loss_computation = loss_computation
         self.pseudo_bulk = pseudo_bulk
         self.mixup_penalty = mixup_penalty
+        self.mixup_penalty_aggregation = mixup_penalty_aggregation
+        self.average_variables_mixup_penalty = average_variables_mixup_penalty
         self.z_signature = None
-        self.already_printed_warning = False
+        self.logger_messages = set()
 
     def _get_inference_input(self,tensors):
         batch_index = tensors[REGISTRY_KEYS.BATCH_KEY]
@@ -243,10 +265,13 @@ class MixUpVAE(VAE):
         z = inference_outputs["z"]
         z_pseudobulk = inference_outputs["z_pseudobulk"]
         categorical_input = inference_outputs["categorical_input"]
+        one_hot_batch_index = inference_outputs["one_hot_batch_index"]
         library = inference_outputs["library"]
         library_pseudobulk = inference_outputs["library_pseudobulk"]
+        cont_covs_pseudobulk = inference_outputs["cont_covs_pseudobulk"]
         categorical_pseudobulk_input = inference_outputs["categorical_pseudobulk_input"]
-        batch_index = tensors[REGISTRY_KEYS.BATCH_KEY]
+        one_hot_batch_index_pseudobulk = inference_outputs["one_hot_batch_index_pseudobulk"]
+        pseudobulk_indices = inference_outputs["pseudobulk_indices"]
         y = tensors[REGISTRY_KEYS.LABELS_KEY]
 
         cont_key = REGISTRY_KEYS.CONT_COVS_KEY
@@ -264,9 +289,12 @@ class MixUpVAE(VAE):
             "z_pseudobulk": z_pseudobulk,
             "library": library,
             "library_pseudobulk": library_pseudobulk,
-            "batch_index": batch_index,
+            "one_hot_batch_index": one_hot_batch_index,
+            "one_hot_batch_index_pseudobulk": one_hot_batch_index_pseudobulk,
+            "pseudobulk_indices": pseudobulk_indices,
             "y": y,
             "cont_covs": cont_covs,
+            "cont_covs_pseudobulk": cont_covs_pseudobulk,
             "categorical_input": categorical_input,
             "categorical_pseudobulk_input": categorical_pseudobulk_input,
             "size_factor": size_factor,
@@ -288,25 +316,30 @@ class MixUpVAE(VAE):
         Runs the inference (encoder) model.
         """
         x_ = x
-        x_pseudobulk_ = x.mean(axis=0).unsqueeze(0)
 
-        # compute proportions in batch
-        unique_indices, counts = y.unique(return_counts=True)
-        proportions = counts.float() / len(y)
-        # create training signature
-        x_signature_ = []
-        for cell_type in unique_indices:
-            idx = (y == cell_type).flatten()
-            x_pure = x_[idx, :].mean(axis=0)
-            x_signature_.append(x_pure)
-        x_signature_ = torch.stack(x_signature_, dim=0)
+        # create self.n_pseudobulks
+        if self.n_cells_per_pseudobulk is None or self.n_cells_per_pseudobulk > x_.shape[0] :
+            n_cells_per_pseudobulk = x_.shape[0]
+        else:
+            n_cells_per_pseudobulk = self.n_cells_per_pseudobulk
+        random_state = np.random.RandomState(seed=42)
+        pseudobulk_indices = random_state.choice(
+            x_.shape[0],
+            size = (self.n_pseudobulks, n_cells_per_pseudobulk),
+            replace = True,
+        )
+        x_pseudobulk_ = x_[pseudobulk_indices, :].mean(axis=1)
+        y_pseudobulk = y[pseudobulk_indices, :].squeeze(axis=2)
+
+        all_proportions = compute_ground_truth_proportions(
+            y_pseudobulk, self.n_labels, n_cells_per_pseudobulk
+        )
+        counts, x_signature_mask, x_signature_ = compute_signature(y, x_)
 
         # library size
         if self.use_observed_lib_size:
             library = torch.log(x.sum(axis=1)).unsqueeze(1)
-            library_pseudobulk = torch.log(x_pseudobulk_.sum())
-
-        # transform in logscale
+            library_pseudobulk = torch.log(x_pseudobulk_.sum(axis=1)).unsqueeze(1)
         if self.log_variational:
             x_ = torch.log(1 + x_)
             x_pseudobulk_ = torch.log(1 + x_pseudobulk_)
@@ -316,21 +349,13 @@ class MixUpVAE(VAE):
         if cont_covs is not None:
             # for single-cell and pseudobulk
             encoder_input = torch.cat((x_, cont_covs), dim=-1)
-            encoder_pseudobulk_input = torch.cat(
-                (x_pseudobulk_, cont_covs.mean(axis=0).unsqueeze(1)), dim=-1
-            )
-            # for the signature
-            cont_covs_signature = []
-            for cell_type in unique_indices:
-                idx = (y == cell_type).flatten()
-                cont_covs_pure = cont_covs[idx, :].mean(axis=0)
-                cont_covs_signature.append(cont_covs_pure)
-            cont_covs_signature = torch.stack(cont_covs_signature, dim=0)
-            encoder_signature_input = torch.cat(
-                (x_signature_, cont_covs_signature), dim=-1
-            )
+            cont_covs_pseudobulk = cont_covs[pseudobulk_indices, :].mean(axis=1)
+            encoder_pseudobulk_input = torch.cat((x_pseudobulk_, cont_covs_pseudobulk), dim=-1)
+            cont_covs_signature = torch.matmul(x_signature_mask, cont_covs)/counts.unsqueeze(-1)
+            encoder_signature_input = torch.cat((x_signature_, cont_covs_signature), dim=-1)
         else:
             encoder_input = x_
+            cont_covs_pseudobulk = ()
             encoder_pseudobulk_input = x_pseudobulk_
             encoder_signature_input = x_signature_
 
@@ -346,34 +371,37 @@ class MixUpVAE(VAE):
                     # if n_cat == 0 then no batch index was given, so skip it
                     one_hot_cat_covs = one_hot(cat_covs[j], n_cat)
                     categorical_input.append(one_hot_cat_covs)
-                    one_hot_cat_covs_pseudobulk = one_hot_cat_covs.mean(axis=0).resize(1,n_cat)
+                    one_hot_cat_covs_pseudobulk = one_hot_cat_covs[pseudobulk_indices, :].mean(axis=1)
                     categorical_pseudobulk_input.append(one_hot_cat_covs_pseudobulk)
-                    categorical_signature_input_temp = []
-                    for cell_type in unique_indices:
-                        idx = (y == cell_type).flatten()
-                        one_hot_cat_covs_pure = one_hot_cat_covs[idx, :].mean(axis=0)
-                        categorical_signature_input_temp.append(one_hot_cat_covs_pure)
-                    categorical_signature_input.append(torch.stack(categorical_signature_input_temp))
+                    one_hot_cat_covs_signature = torch.matmul(x_signature_mask, one_hot_cat_covs)/counts.unsqueeze(-1)
+                    categorical_signature_input.append(one_hot_cat_covs_signature)
                     j+=1
-            categorical_input_bis = copy.deepcopy(categorical_input)
-            categorical_pseudobulk_input_bis = copy.deepcopy(categorical_pseudobulk_input)
+            categorical_input_copy = copy.deepcopy(categorical_input)
+            categorical_pseudobulk_input_copy = copy.deepcopy(categorical_pseudobulk_input)
+        else :
+            categorical_input_copy = ()
+            categorical_pseudobulk_input_copy = ()
 
         # Encode covariates
         if not self.encode_covariates:
+            # don't enconde categorical covariates but return copy in inference outputs
             categorical_input = ()
             categorical_pseudobulk_input = ()
             categorical_signature_input = ()
+        
+        one_hot_batch_index = one_hot(batch_index, self.n_batch)
+        one_hot_batch_index_pseudobulk = one_hot_batch_index[pseudobulk_indices, :].mean(axis=1)
 
         # regular encoding
         qz, z = self.z_encoder(
             encoder_input,
-            batch_index,
+            one_hot_batch_index,
             *categorical_input,
         )
         # pseudobulk encoding
         qz_pseudobulk, z_pseudobulk = self.z_encoder(
             encoder_pseudobulk_input,
-            batch_index,
+            one_hot_batch_index_pseudobulk,
             *categorical_pseudobulk_input,
         )
         # pure cell type signature encoding
@@ -385,12 +413,7 @@ class MixUpVAE(VAE):
             )
         elif self.signature_type == "post_inference":
             # create signature matrix - inside the latent space
-            z_signature = []
-            for cell_type in unique_indices:
-                idx = (y == cell_type).flatten()
-                z_pure = z[idx, :].mean(axis=0)
-                z_signature.append(z_pure)
-            z_signature = torch.stack(z_signature, dim=0)
+            z_signature = torch.matmul(x_signature_mask, z)/counts.unsqueeze(-1)
 
         # library size
         ql = None
@@ -416,27 +439,29 @@ class MixUpVAE(VAE):
             else:
                 library = ql.sample((n_samples,))
 
-        if self.z_encoder.training and z_signature.shape[0] == self.n_cell_types:
+        if self.z_encoder.training and z_signature.shape[0] == self.n_labels:
             # then keep training signature in memory to be used for validation
             self.z_signature = z_signature
-        elif not self.z_encoder.training and z_signature.shape[0] == self.n_cell_types:
-            # then overwrite validation signature with training one
-            z_signature = self.z_signature
 
         outputs = {
+            "all_proportions": all_proportions,
+            # encodings
             "z": z,
             "qz": qz,
             "ql": ql,
             "library": library,
-            "categorical_input": categorical_input_bis,
+            "categorical_input": categorical_input_copy,
+            "one_hot_batch_index": one_hot_batch_index,
             # pseudobulk encodings
+            "pseudobulk_indices": pseudobulk_indices,
             "z_pseudobulk": z_pseudobulk,
             "qz_pseudobulk": qz_pseudobulk,
             "ql_pseudobulk": ql_pseudobulk,
             "library_pseudobulk": library_pseudobulk,
-            "categorical_pseudobulk_input": categorical_pseudobulk_input_bis,
+            "categorical_pseudobulk_input": categorical_pseudobulk_input_copy,
+            "cont_covs_pseudobulk": cont_covs_pseudobulk,
+            "one_hot_batch_index_pseudobulk": one_hot_batch_index_pseudobulk,
             # pure cell type signature encodings
-            "proportions": proportions,
             "z_signature": z_signature,
         }
 
@@ -449,10 +474,13 @@ class MixUpVAE(VAE):
         z_pseudobulk,
         library,
         library_pseudobulk,
-        batch_index,
+        one_hot_batch_index,
+        one_hot_batch_index_pseudobulk,
         cont_covs=None,
+        cont_covs_pseudobulk=None,
         categorical_input=(),
         categorical_pseudobulk_input=(),
+        pseudobulk_indices=(),
         size_factor=None,
         y=None,
         transform_batch=None,
@@ -460,7 +488,7 @@ class MixUpVAE(VAE):
         """Runs the generative model."""
         if self.pseudo_bulk == "post_inference":
             # create it from z by overwritting the one coming from inference
-            z_pseudobulk = z.mean(axis=0).unsqueeze(0)
+            z_pseudobulk = z[pseudobulk_indices, :].mean(axis=1)
 
         if cont_covs is None:
             decoder_input = z
@@ -472,18 +500,17 @@ class MixUpVAE(VAE):
             decoder_pseudobulk_input = torch.cat(
                 [
                     z_pseudobulk,
-                    cont_covs.unsqueeze(0)
+                    cont_covs_pseudobulk.unsqueeze(0)
                     .expand(z_pseudobulk.size(0), -1, -1)
-                    .mean(axis=0)
-                    .unsqueeze(1),
                 ],
                 dim=-1,
             )
         else:
             decoder_input = torch.cat([z, cont_covs], dim=-1)
             decoder_pseudobulk_input = torch.cat(
-                [z_pseudobulk, cont_covs.mean(axis=0).unsqueeze(1)], dim=-1
+                [z_pseudobulk, cont_covs_pseudobulk], dim=-1
             )
+            
 
         if transform_batch is not None:
             batch_index = torch.ones_like(batch_index) * transform_batch
@@ -493,14 +520,16 @@ class MixUpVAE(VAE):
             size_factor = library
             size_factor_pseudobulk = library_pseudobulk
 
+        one_hot_y = one_hot(y, self.n_labels)
         px_scale, px_r, px_rate, px_dropout = self.decoder(
             self.dispersion,
             decoder_input,
             size_factor,
-            batch_index,
+            one_hot_batch_index,
             *categorical_input,
-            y,
+            one_hot_y,
         )
+        one_hot_y_pseudobulk = one_hot_y[pseudobulk_indices, :].mean(axis=1)
         (
             px_pseudobulk_scale,
             px_pseudobulk_r,
@@ -510,17 +539,20 @@ class MixUpVAE(VAE):
             self.dispersion,
             decoder_pseudobulk_input,
             size_factor_pseudobulk,
-            batch_index,
+            one_hot_batch_index_pseudobulk,
             *categorical_pseudobulk_input,
-            y,
-        )  # for pseudobulk, batch_index, categorical_input and y are not the right dimension
+            one_hot_y_pseudobulk,
+        )
         if self.dispersion == "gene-label":
-            # does not make sense for pseudobulk
             px_r = F.linear(
-                one_hot(y, self.n_labels), self.px_r
+                one_hot_y, self.px_r
             )  # px_r gets transposed - last dimension is nb genes
+            px_pseudobulk_r = F.linear(
+                one_hot_y_pseudobulk, self.px_r
+            )  # should we really create self.px_pseudobulk_r ?
         elif self.dispersion == "gene-batch":
             px_r = F.linear(one_hot(batch_index, self.n_batch), self.px_r)
+            px_pseudobulk_r = F.linear(one_hot(batch_index, self.n_batch), self.px_r)
         elif self.dispersion == "gene":
             px_r = self.px_r
             px_pseudobulk_r = self.px_r
@@ -539,7 +571,6 @@ class MixUpVAE(VAE):
             px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
         elif self.gene_likelihood == "poisson":
             px = Poisson(px_rate, scale=px_scale)
-        # pseudobulk gene likelihood
         px_pseudobulk = NegativeBinomial(
             mu=px_pseudobulk_rate, theta=px_pseudobulk_r, scale=px_pseudobulk_scale
         )
@@ -612,29 +643,44 @@ class MixUpVAE(VAE):
         loss = torch.mean(reconst_loss + weighted_kl_local) + mixup_loss
 
         # correlation in latent space
-        mean_z = torch.mean(inference_outputs["z"], axis=0)
-        pearson_coeff = get_pearsonr_torch(
-            mean_z, inference_outputs["z_pseudobulk"].squeeze(0)
-        )
+        pseudobulk_indices = inference_outputs["pseudobulk_indices"]
+        mean_z = inference_outputs["z"][pseudobulk_indices, :].mean(axis=1)
+        pseudobulk_z = inference_outputs["z_pseudobulk"]
+        pearson_coeff = get_mean_pearsonr_torch(mean_z, pseudobulk_z)
 
         # deconvolution in latent space
-        predicted_proportions = nnls(
-            inference_outputs["z_signature"].detach().cpu().numpy().T,
-            inference_outputs["z_pseudobulk"].detach().cpu().numpy().flatten(),
-        )[0]
-        if np.any(predicted_proportions):
-            # if not all zeros, sum the predictions to 1
-            predicted_proportions = predicted_proportions / predicted_proportions.sum()
-        proportions_array = inference_outputs["proportions"].detach().cpu().numpy()
-        cosine_similarity = (
-            np.dot(proportions_array, predicted_proportions)
-            / np.linalg.norm(proportions_array)
-            / np.linalg.norm(predicted_proportions)
-        )
-        pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
-        # Deconvolution error
-        mse_deconv = np.mean((proportions_array - predicted_proportions) ** 2)
-        mae_deconv = np.mean(np.abs(proportions_array - predicted_proportions))
+        pearson_deconv_results = []
+        cosine_deconv_results = []
+        mse_deconv_results = []
+        mae_deconv_results = []
+        for i, pseudobulk in enumerate(pseudobulk_z.detach().cpu().numpy()):
+            predicted_proportions = nnls(
+                self.z_signature.detach().cpu().numpy().T,
+                pseudobulk,
+            )[0]
+            if np.any(predicted_proportions):
+                # if not all zeros, sum the predictions to 1
+                predicted_proportions = predicted_proportions / predicted_proportions.sum()
+            proportions_array = inference_outputs["all_proportions"][i].detach().cpu().numpy()
+            # Deconvolution metrics
+            cosine_similarity = (
+                np.dot(proportions_array, predicted_proportions)
+                / np.linalg.norm(proportions_array)
+                / np.linalg.norm(predicted_proportions)
+            )
+            pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
+            pearson_deconv_results.append(pearson_coeff_deconv)
+            cosine_deconv_results.append(cosine_similarity)
+            # Deconvolution errors
+            mse_deconv = np.mean((proportions_array - predicted_proportions)**2)
+            mae_deconv = np.mean(np.abs(proportions_array - predicted_proportions))
+            mse_deconv_results.append(mse_deconv)
+            mae_deconv_results.append(mae_deconv)
+        pearson_coeff_deconv = sum(pearson_deconv_results)/len(pearson_deconv_results)
+        cosine_similarity = sum(cosine_deconv_results)/len(cosine_deconv_results)
+        mse_deconv = sum(mse_deconv_results)/len(mse_deconv_results)
+        mae_deconv = sum(mae_deconv_results)/len(mae_deconv_results)
+        
 
         # logging
         kl_local = {
@@ -658,58 +704,71 @@ class MixUpVAE(VAE):
 
     def get_mix_up_loss(self, inference_outputs, generative_outputs):
         """Compute L2 loss or KL divergence between single cells average and pseudobulk."""
+        pseudobulk_indices = inference_outputs["pseudobulk_indices"]
         if self.mixup_penalty == "l2":
             # l2 penalty between mean(cells) and pseudobulk
             if self.loss_computation == "latent_space":
-                mean_single_cells = torch.mean(inference_outputs["z"], axis=0)
+                mean_single_cells = inference_outputs["z"][pseudobulk_indices, :].mean(axis=1)
                 pseudobulk = inference_outputs["z_pseudobulk"]
             elif self.loss_computation == "reconstructed_space":
-                if not self.already_printed_warning:
-                    logger.warn(
-                        "Sampling with the reparametrization trick is not possible with"
-                        " NegativeBinomial or ZeroInflatedNegativeBinomial "
-                        "distributions. Therefore, the MixUp penalty will not be used "
-                        "during gradient descent."
-                    )
-                    self.already_printed_warning = True
-                mean_single_cells = torch.mean(
-                    generative_outputs["px"].sample(), axis=0
+                message = (
+                    "Sampling with the reparametrization trick is not possible with"
+                    "discrete probability distribution like Poisson, NB, ZINB. "
+                    "Therefore, the MixUp penalty will the rate (i.e. mean) of  the"
+                    "distribution instead."
                 )
-                pseudobulk = generative_outputs["px_pseudobulk"].sample()
-            mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2)
+                if message not in self.logger_messages:
+                    logger.warn(message)
+                    self.logger_messages.add(message)
+                if self.gene_likelihood in ("zinb", "nb"):
+                    mean_single_cells = generative_outputs["px"].mu[pseudobulk_indices, :].mean(axis=1)
+                    pseudobulk = generative_outputs["px_pseudobulk"].mu
+                elif self.gene_likelihood == "poisson":
+                    mean_single_cells = generative_outputs["px"].rate[pseudobulk_indices, :].mean(axis=1)
+                    pseudobulk = generative_outputs["px_pseudobulk"].rate
+            mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2, axis=1)
+            if self.average_variables_mixup_penalty:
+                mixup_penalty /= mean_single_cells.shape[1]
         elif self.mixup_penalty == "kl":
             # kl of mean(cells) compared to reference pseudobulk
             if self.loss_computation == "latent_space":
-                mean_averaged_cells = inference_outputs["qz"].mean.mean(axis=0)
-                std_averaged_cells = inference_outputs["qz"].variance.sum(
-                    axis=0
-                ).sqrt() / len(inference_outputs["qz"].loc)
+                mean_averaged_cells = inference_outputs["qz"].mean[pseudobulk_indices, :].mean(axis=1)
+                std_averaged_cells = inference_outputs["qz"].variance[pseudobulk_indices, :].sum(
+                    axis=1
+                ).sqrt() / pseudobulk_indices.shape[1]
                 averaged_cells_distrib = Normal(mean_averaged_cells, std_averaged_cells)
+                pseudobulk_reference_distrib = inference_outputs["qz_pseudobulk"]
             elif self.loss_computation == "reconstructed_space":
-                distrib_type = str(generative_outputs["px"].__class__).split(".")[-1][
-                    :-2
-                ]
-                if distrib_type == "Poisson":
-                    rate_averaged_cells = generative_outputs["px"].rate.mean(axis=0)
-                    averaged_cells_distrib = Poisson(rate_averaged_cells)
-                elif self.dispersion != "gene":
-                    raise NotImplementedError(
-                        "The parameters of the sum of independant variables following "
-                        "negative binomials with varying dispersion is not computable yet."
-                    )
-                elif distrib_type == "NegativeBinomial":
-                    # only works because dispersion is constant across cells
-                    mean_averaged_cells = generative_outputs["px"].mu.mean(axis=0)
-                    averaged_cells_distrib = NegativeBinomial(rate_averaged_cells)
-                elif self.gene_likelihood == "ZeroInflatedNegativeBinomial":
-                    # not yet implemented because of the zero inflation
-                    raise NotImplementedError(
-                        "The parameters of the sum of independant variables following "
-                        "zero-inflated negative binomials is not computable yet."
-                    )
+                raise NotImplementedError(
+                    "KL divergence is not implemented for other distributions than Normal."
+                )
+                # if self.gene_likelihood == "poisson":
+                #     rate_averaged_cells = generative_outputs["px"].rate[pseudobulk_indices, :].mean(axis=1)
+                #     averaged_cells_distrib = Poisson(rate_averaged_cells)
+                # elif self.dispersion != "gene":
+                #     raise NotImplementedError(
+                #         "The parameters of the sum of independant variables following "
+                #         "negative binomials with varying dispersion is not computable yet."
+                #     )
+                # elif self.gene_likelihood == "nb":
+                #     # only works because dispersion is constant across cells
+                #     mean_averaged_cells = generative_outputs["px"].mu[pseudobulk_indices, :].mean(axis=1)
+                #     dispersion_averaged_cells = generative_outputs["px"].theta[pseudobulk_indices, :].mean(axis=1)
+                #     averaged_cells_distrib = NegativeBinomial(mu=mean_averaged_cells, theta=dispersion_averaged_cells)
+                # elif self.gene_likelihood == "zinb":
+                #     # not yet implemented because of the zero inflation
+                #     raise NotImplementedError(
+                #         "The parameters of the sum of independant variables following "
+                #         "zero-inflated negative binomials is not computable yet."
+                #     )
+                # pseudobulk_reference_distrib = generative_outputs["px_pseudobulk"]
             mixup_penalty = kl(
-                averaged_cells_distrib, generative_outputs["px_pseudobulk"]
-            ).sum(
-                dim=-1
-            )  # should it be negative in the case of kl?
+                averaged_cells_distrib, pseudobulk_reference_distrib
+            ).sum(dim=-1)
+        if self.mixup_penalty_aggregation == "max":
+            mixup_penalty = mixup_penalty.max()
+        else :
+            mixup_penalty = torch.sum(mixup_penalty)
+            if self.mixup_penalty_aggregation == "mean":
+                mixup_penalty /= mean_single_cells.shape[0]
         return mixup_penalty

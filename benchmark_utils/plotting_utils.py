@@ -108,10 +108,6 @@ def plot_deconv_lineplot(results: Dict[int, pd.DataFrame],
     if save:
         plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
-
-
-
-
 def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
     """Plot the train or val metrics from training."""
     if train:
@@ -138,6 +134,26 @@ def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
     plt.title(f"{suffix} metrics")
     plt.show()
 
+def plot_mse_mae_deconv(model_history, train: bool = True, n_epochs: int = 100):
+    """Plot the train or val MSE and MAE deconv errors from training."""
+    if train:
+        suffix = "train"
+    else:
+        suffix = "validation"
+    plt.clf()
+    plt.plot(
+        range(n_epochs), 
+        model_history[f"mse_deconv_{suffix}"], 
+        label="Deconv MSE error",
+    )
+    plt.plot(
+        range(n_epochs), 
+        model_history[f"mae_deconv_{suffix}"], 
+        label="Deconv MAE error",
+    )
+    plt.legend()
+    plt.title(f"{suffix} errors")
+    plt.show()
 
 def plot_loss(model_history, n_epochs: int = 100):
     """Plot the train and val loss from training."""
@@ -152,7 +168,6 @@ def plot_loss(model_history, n_epochs: int = 100):
     plt.title("Loss epochs")
     plt.show()
 
-
 def plot_mixup_loss(model_history, n_epochs: int = 100):
     """Plot the train and val mixup loss from training."""
     plt.clf()
@@ -165,7 +180,6 @@ def plot_mixup_loss(model_history, n_epochs: int = 100):
     plt.legend()
     plt.title("Mixup loss epochs")
     plt.show()
-
 
 def plot_reconstruction_loss(model_history, n_epochs: int = 100):
     """Plot the train and val reconstruction loss from training."""
@@ -180,7 +194,6 @@ def plot_reconstruction_loss(model_history, n_epochs: int = 100):
     plt.title("Reconstruction loss epochs")
     plt.show()
 
-
 def plot_kl_loss(model_history, n_epochs: int = 100):
     """Plot the train and val KL loss from training."""
     plt.clf()
@@ -193,7 +206,6 @@ def plot_kl_loss(model_history, n_epochs: int = 100):
     plt.legend()
     plt.title("KL loss epochs")
     plt.show()
-
 
 def plot_pearson_random(model_history, train: bool = True, n_epochs: int = 100):
     """Plot the train or val random vs normal pearson deconv metrics from training."""
@@ -216,27 +228,19 @@ def plot_pearson_random(model_history, train: bool = True, n_epochs: int = 100):
     plt.title(f"{suffix} metrics")
     plt.show()
 
-
 def compare_tuning_results(
       all_results, variable_to_plot: str, variable_tuned: str, n_epochs: int = 100, hp_index_to_plot: list = None
 ):
     """Plot the train or val losses for a selection of hyperparameters."""
-    all_hp = all_results.hyperparameter.unique()
+    all_hp = all_results[variable_tuned].unique()
     if all_hp.dtype != "0":
         all_hp.sort()
-    if hp_index_to_plot is None:
-        # plot all HPs
-        hp_index_to_plot = range(len(all_hp))
-
-    plt.clf()
-    for i, hp in enumerate(all_hp):
-        if i in hp_index_to_plot:
-            model_history = all_results.loc[all_results.hyperparameter == hp]
-            plt.plot(
-                range(n_epochs),
-                model_history[variable_to_plot],
-                label=f"{variable_tuned}={hp}",
-            )
-    plt.legend()
-    plt.title(variable_to_plot)
+    if hp_index_to_plot is not None:
+        hp_to_plot = all_hp[hp_index_to_plot]
+        all_results = all_results.loc[all_results[variable_tuned].isin(hp_to_plot)]
+    
+    custom_palette = sns.color_palette("husl", n_colors=len(all_results[variable_tuned].unique()))
+    all_results["epoch"] = all_results.index
+    sns.set_theme(style="darkgrid")
+    sns.lineplot(x="epoch", y=variable_to_plot, hue=variable_tuned, ci="sd", data=all_results, err_style="bars", palette=custom_palette)
     plt.show()

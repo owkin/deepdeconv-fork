@@ -1,7 +1,7 @@
 """Constants and global variables to run the different deconv files."""
 
 ## constants for run_mixupvi.py
-TUNE_MIXUPVI = False
+TUNE_MIXUPVI = True
 TRAINING_DATASET = "CTI_PROCESSED"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_CELL_TYPE_GROUP = (
     "2nd_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
@@ -30,26 +30,31 @@ BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
 
 ## general mixupvi constants when training it or preprocessing data
 SAVE_MODEL = False
+SEED = 0
 N_GENES = 3000 # number of input genes after preprocessing
 # MixUpVI training hyperparameters
 MAX_EPOCHS = 100
-BATCH_SIZE = 4092
+BATCH_SIZE = 2048
 TRAIN_SIZE = 0.7 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI model hyperparameters
-CONT_COV = None  # list of continuous covariates to include
-CAT_COV = ["donor_id", "assay"] # list of categorical covariates to include
-ENCODE_COVARIATES = True # whether to encode cont/cat covars (they are always decoded)
-SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
-USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
+N_PSEUDOBULKS = 1
+N_CELLS_PER_PSEUDOBULK = None # None (then will be batch size) or int (will cap at batch size)
+LATENT_SIZE = 30
+CONT_COV = None  # None or list of continuous covariates to include
+CAT_COV = None # None or ["donor_id", "assay"]
+ENCODE_COVARIATES = False # whether to encode cont/cat covars (they are always decoded)
 LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
 PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
+SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 MIXUP_PENALTY = "l2"  # ["l2", "kl"]
-DISPERSION = "gene"  # ["gene", "gene_cell"]
+DISPERSION = "gene"  # ["gene", "gene_label"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
-LATENT_SIZE = 30
+MIXUP_PENATLY_AGGREGATION = "mean" # ["mean", "sum", "max"]
+AVERAGE_VARIABLES_MIXUP_PENALTY = False 
+USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 
 # different possibilities of cell groupings with the CTI dataset
 GROUPS = {

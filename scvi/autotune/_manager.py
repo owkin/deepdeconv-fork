@@ -158,7 +158,8 @@ class TunerManager:
                 "pearson_coeff_validation": "max",
                 "cosine_similarity_validation": "max",
                 "pearson_coeff_deconv_validation": "max",
-                "pearson_coeff_random_validation": "max",
+                "mse_deconv_validation": "min",
+                "mae_deconv_validation": "min",
                 # train metrics
                 "train_loss_epoch": "min",
                 "mixup_penalty_train": "min",
@@ -167,7 +168,8 @@ class TunerManager:
                 "pearson_coeff_train": "max",
                 "cosine_similarity_train": "max",
                 "pearson_coeff_deconv_train": "max",
-                "pearson_coeff_random_train": "max",
+                "mse_deconv_train": "min",
+                "mae_deconv_train": "min",
             }
 
         registry = {
