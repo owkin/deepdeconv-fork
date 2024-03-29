@@ -33,7 +33,7 @@ SAVE_MODEL = False
 SEED = 0
 N_GENES = 3000 # number of input genes after preprocessing
 # MixUpVI training hyperparameters
-MAX_EPOCHS = 10
+MAX_EPOCHS = 100
 BATCH_SIZE = 2048
 TRAIN_SIZE = 0.7 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None

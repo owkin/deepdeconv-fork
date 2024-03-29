@@ -77,7 +77,12 @@ n_hidden_search_space = {
 n_layers_search_space = {
     "n_layers": tune.grid_search([1, 2, 3])
 }
-SEARCH_SPACE = example_with_several_seeds
+n_pseudobulks_search_space = {
+    "n_pseudobulks": tune.grid_search([1, 5, 10, 30, 50, 100]),
+    "seed": tune.grid_search([3, 8, 12])
+    # "seed": tune.grid_search([3, 8, 12, 23, 42])
+}
+SEARCH_SPACE = n_pseudobulks_search_space
 TUNED_VARIABLES = list(SEARCH_SPACE.keys())
 NUM_SAMPLES = 1 # will only perform once the gridsearch (useful to change if mix of grid and random search for instance)
 

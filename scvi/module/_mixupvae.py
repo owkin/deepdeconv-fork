@@ -378,6 +378,9 @@ class MixUpVAE(VAE):
                     j+=1
             categorical_input_copy = copy.deepcopy(categorical_input)
             categorical_pseudobulk_input_copy = copy.deepcopy(categorical_pseudobulk_input)
+        else :
+            categorical_input_copy = ()
+            categorical_pseudobulk_input_copy = ()
 
         # Encode covariates
         if not self.encode_covariates:
@@ -448,6 +451,7 @@ class MixUpVAE(VAE):
             "ql": ql,
             "library": library,
             "categorical_input": categorical_input_copy,
+            "one_hot_batch_index": one_hot_batch_index,
             # pseudobulk encodings
             "pseudobulk_indices": pseudobulk_indices,
             "z_pseudobulk": z_pseudobulk,
@@ -455,6 +459,8 @@ class MixUpVAE(VAE):
             "ql_pseudobulk": ql_pseudobulk,
             "library_pseudobulk": library_pseudobulk,
             "categorical_pseudobulk_input": categorical_pseudobulk_input_copy,
+            "cont_covs_pseudobulk": cont_covs_pseudobulk,
+            "one_hot_batch_index_pseudobulk": one_hot_batch_index_pseudobulk,
             # pure cell type signature encodings
             "z_signature": z_signature,
         }
