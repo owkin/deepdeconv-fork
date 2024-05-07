@@ -103,16 +103,6 @@ class MixUpVAE(VAE):
         Whether to concatenate covariates to expression in encoder
     mixup_penalty
         The loss to use to compare the average of encoded cell and the encoded pseudobulk.
-    mixup_penalty_aggregation
-        One of 
-
-        * ``'sum'`` - Sum the n_pseudobulk L2 losses
-        * ``'mean'`` - Average the n_pseudobulk L2 losses
-        * ``'max'`` - Take the max among the n_pseudobulk L2 losses
-    average_variables_mixup_penalty
-        Whether to average the mixup penalty across the different variables. When False, the values are just summed.
-        If the loss_computation is in the latent space, there are n_latent variables.
-        If inside the reconstructed space, there are n_input variables.
     deeply_inject_covariates
         Whether to concatenate covariates into output of hidden layers in encoder/decoder. This option
         only applies when `n_layers` > 1. The covariates are concatenated to the input of subsequent hidden layers.
@@ -146,7 +136,7 @@ class MixUpVAE(VAE):
         n_input: int,
         n_batch: int = 0,
         n_labels: int = 0,
-        n_hidden: Tunable[int] = 128,
+        n_hidden: Tunable[int] = 512,
         n_latent: Tunable[int] = 10,
         n_layers: Tunable[int] = 1,
         seed: Tunable[int] = 0,
@@ -177,8 +167,6 @@ class MixUpVAE(VAE):
         loss_computation: Tunable[str] = "latent_space",
         pseudo_bulk: Tunable[str] = "pre_encoded",
         mixup_penalty: Tunable[str] = "l2",
-        mixup_penalty_aggregation: Tunable[str] = "mean",
-        average_variables_mixup_penalty: Tunable[bool] = False,
     ):
         torch.manual_seed(seed)
 
@@ -222,8 +210,6 @@ class MixUpVAE(VAE):
         self.loss_computation = loss_computation
         self.pseudo_bulk = pseudo_bulk
         self.mixup_penalty = mixup_penalty
-        self.mixup_penalty_aggregation = mixup_penalty_aggregation
-        self.average_variables_mixup_penalty = average_variables_mixup_penalty
         self.z_signature = None
         self.logger_messages = set()
 
@@ -366,7 +352,7 @@ class MixUpVAE(VAE):
             categorical_pseudobulk_input = []
             categorical_signature_input = []
             j=0
-            for n_cat in self.z_encoder.encoder.n_cat_list:
+            for n_cat in self.decoder.px_decoder.n_cat_list:
                 if n_cat > 0 :
                     # if n_cat == 0 then no batch index was given, so skip it
                     one_hot_cat_covs = one_hot(cat_covs[j], n_cat)
@@ -653,11 +639,18 @@ class MixUpVAE(VAE):
         cosine_deconv_results = []
         mse_deconv_results = []
         mae_deconv_results = []
+        z_signature = inference_outputs["z_signature"] if self.z_signature is None else self.z_signature
         for i, pseudobulk in enumerate(pseudobulk_z.detach().cpu().numpy()):
             predicted_proportions = nnls(
-                self.z_signature.detach().cpu().numpy().T,
+                z_signature.detach().cpu().numpy().T,
                 pseudobulk,
             )[0]
+            if self.z_signature is None:
+                # resize predicted_proportions to the right number of labels
+                full_predicted_proportions = np.zeros(self.n_labels)
+                for j, cell_type in enumerate(tensors["labels"].unique().detach().cpu()):
+                    full_predicted_proportions[int(cell_type)] = predicted_proportions[j]
+                predicted_proportions = full_predicted_proportions
             if np.any(predicted_proportions):
                 # if not all zeros, sum the predictions to 1
                 predicted_proportions = predicted_proportions / predicted_proportions.sum()
@@ -727,8 +720,6 @@ class MixUpVAE(VAE):
                     mean_single_cells = generative_outputs["px"].rate[pseudobulk_indices, :].mean(axis=1)
                     pseudobulk = generative_outputs["px_pseudobulk"].rate
             mixup_penalty = torch.sum((pseudobulk - mean_single_cells) ** 2, axis=1)
-            if self.average_variables_mixup_penalty:
-                mixup_penalty /= mean_single_cells.shape[1]
         elif self.mixup_penalty == "kl":
             # kl of mean(cells) compared to reference pseudobulk
             if self.loss_computation == "latent_space":
@@ -765,10 +756,7 @@ class MixUpVAE(VAE):
             mixup_penalty = kl(
                 averaged_cells_distrib, pseudobulk_reference_distrib
             ).sum(dim=-1)
-        if self.mixup_penalty_aggregation == "max":
-            mixup_penalty = mixup_penalty.max()
-        else :
-            mixup_penalty = torch.sum(mixup_penalty)
-            if self.mixup_penalty_aggregation == "mean":
-                mixup_penalty /= mean_single_cells.shape[0]
+        
+        mixup_penalty = torch.sum(mixup_penalty) / mean_single_cells.shape[0]
+        
         return mixup_penalty

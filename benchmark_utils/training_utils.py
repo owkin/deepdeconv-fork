@@ -15,6 +15,7 @@ from constants import (
     MAX_EPOCHS,
     BATCH_SIZE,
     LATENT_SIZE,
+    N_HIDDEN,
     N_PSEUDOBULKS,
     N_CELLS_PER_PSEUDOBULK,
     TRAIN_SIZE,
@@ -29,8 +30,6 @@ from constants import (
     MIXUP_PENALTY,
     DISPERSION,
     GENE_LIKELIHOOD,
-    MIXUP_PENATLY_AGGREGATION,
-    AVERAGE_VARIABLES_MIXUP_PENALTY,
     SEED,
 )
 
@@ -60,11 +59,12 @@ def tune_mixupvi(adata: ad.AnnData,
         search_space=search_space,
         num_samples=num_samples, # will randomly num_samples samples (with replacement) among the HP cominations specified
         max_epochs=MAX_EPOCHS,
-        resources={"cpu": 10, "gpu": 0.5},
+        resources={"cpu": 6, "gpu": 1},
     )
 
     all_results, best_hp, tuning_path, search_path = format_and_save_tuning_results(
         tuning_results, variables=TUNED_VARIABLES, training_dataset=training_dataset,
+        cat_cov=CAT_COV, cont_cov=CONT_COV,
     )
 
     return all_results, best_hp, tuning_path, search_path
@@ -95,6 +95,7 @@ def fit_mixupvi(adata: ad.AnnData,
                 n_pseudobulks=N_PSEUDOBULKS,
                 n_cells_per_pseudobulk=N_CELLS_PER_PSEUDOBULK,
                 n_latent=LATENT_SIZE,
+                n_hidden=N_HIDDEN,
                 use_batch_norm=USE_BATCH_NORM,
                 signature_type=SIGNATURE_TYPE,
                 loss_computation=LOSS_COMPUTATION,
@@ -103,8 +104,6 @@ def fit_mixupvi(adata: ad.AnnData,
                 mixup_penalty=MIXUP_PENALTY,
                 dispersion=DISPERSION,
                 gene_likelihood=GENE_LIKELIHOOD,
-                mixup_penalty_aggregation=MIXUP_PENATLY_AGGREGATION,
-                average_variables_mixup_penalty=AVERAGE_VARIABLES_MIXUP_PENALTY,
             )
             mixupvi_model.view_anndata_setup()
             mixupvi_model.train(

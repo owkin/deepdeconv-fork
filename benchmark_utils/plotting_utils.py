@@ -241,6 +241,12 @@ def compare_tuning_results(
     
     custom_palette = sns.color_palette("husl", n_colors=len(all_results[variable_tuned].unique()))
     all_results["epoch"] = all_results.index
+    if (n_nan := all_results[variable_to_plot].isna().sum()) > 0:
+        print(
+            f"There are {n_nan} missing values in the variable to plot ({variable_to_plot})."
+            "Filling them with the next row values."
+        )
+        all_results[variable_to_plot] = all_results[variable_to_plot].fillna(method='bfill')
     sns.set_theme(style="darkgrid")
     sns.lineplot(x="epoch", y=variable_to_plot, hue=variable_tuned, ci="sd", data=all_results, err_style="bars", palette=custom_palette)
     plt.show()
