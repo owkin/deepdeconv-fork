@@ -102,7 +102,7 @@ else:
 
 # %% Load model / results: Uncomment if not running previous cells
 # if TUNE_MIXUPVI:
-#     path = "/home/owkin/project/mixupvi_tuning/n_hidden-seed/CTI_dataset_tune_mixupvi_2024-05-06-09:15:06"
+#     path = "/home/owkin/project/mixupvi_tuning/n_latent-seed/CTI_dataset_tune_mixupvi_2024-06-07-18:30:37"
 #     all_results = read_tuning_results(f"{path}/tuning_results.csv")
 #     search_space = read_search_space(f"{path}/search_space.pkl")
 #     if "best_hp" in search_space:
@@ -132,8 +132,8 @@ plot_kl_loss(model_history, n_epochs=n_epochs)
 # %% Plots to compare HPs
 if TUNE_MIXUPVI:
     n_epochs = len(set(all_results["train_loss_epoch"].index))
-    hp_index_to_plot = None
-    # hp_index_to_plot = [2, 3] # only these index (of the HPs tried) will be plotted, for clearer visualisation
+    # hp_index_to_plot = None
+    hp_index_to_plot = [0,1] # only these index (of the HPs tried) will be plotted, for clearer visualisation
 
     tuned_hps = all_results.T.loc[["train" not in col and "validation" not in col for col in all_results.columns]].index
     if len(tuned_hps) == 1 or (len(tuned_hps) == 2 and "seed" in tuned_hps):

@@ -42,7 +42,7 @@ example_with_several_seeds = {
 latent_space_search_space = {
     "n_latent": tune.grid_search(
         # list(range(len(GROUPS[TRAINING_CELL_TYPE_GROUP]) - 1, 550, 20)) # from n cell types to n marker genes
-        [10, 20, 30, 40, 50, 100, 200]
+        [70, 100, 120, 150]
     ),
     "seed": tune.grid_search([3, 8, 12, 23, 42])
 }
@@ -88,7 +88,11 @@ n_cells_per_pseudobulk_search_space = {
     "n_cells_per_pseudobulk": tune.grid_search([100, 256, 512, 1024, 2048]),
     "seed": tune.grid_search([3, 8, 12])
 }
-SEARCH_SPACE = n_layers_search_space
+use_batch_norm_search_space = {
+    "use_batch_norm": tune.grid_search(["none", "encoder", "decoder", "both"]),
+    "seed": tune.grid_search([3, 8, 12, 23, 42])
+}
+SEARCH_SPACE = latent_space_search_space
 TUNED_VARIABLES = list(SEARCH_SPACE.keys())
 NUM_SAMPLES = 1 # will only perform once the gridsearch (useful to change if mix of grid and random search for instance)
 

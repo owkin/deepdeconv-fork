@@ -18,7 +18,6 @@ from scvi.nn import one_hot
 from scvi.nn import Encoder
 from ._vae import VAE
 from ._utils import (
-    run_incompatible_value_checks,
     get_mean_pearsonr_torch,
     compute_ground_truth_proportions,
     compute_signature,
@@ -196,13 +195,12 @@ class MixUpVAE(VAE):
             extra_encoder_kwargs=extra_encoder_kwargs,
             extra_decoder_kwargs=extra_decoder_kwargs,
         )
-        run_incompatible_value_checks(
-            pseudo_bulk=pseudo_bulk,
-            loss_computation=loss_computation,
-            use_batch_norm=use_batch_norm,
-            mixup_penalty=mixup_penalty,
-            gene_likelihood=gene_likelihood,
-        )
+        if use_batch_norm != "none" and n_pseudobulks == 1:
+            raise ValueError(
+                "Batch normalization cannot be used when only one pseudobulk is "
+                "computed - it cannot be considered as a batch on which batch "
+                "normalization can be applied."
+            )
         
         self.n_pseudobulks = n_pseudobulks
         self.n_cells_per_pseudobulk = n_cells_per_pseudobulk
