@@ -21,8 +21,9 @@ def preprocess_scrna(
     adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for
     sc.pp.log1p(adata)
     adata.raw = adata  # freeze the state in `.raw`
+    adata_filtered = adata.copy()
     sc.pp.highly_variable_genes(
-        adata,
+        adata_filtered,
         n_top_genes=keep_genes,
         subset=True,
         layer="counts",
@@ -30,6 +31,7 @@ def preprocess_scrna(
         batch_key=batch_key,
     )
     #TODO: add the filtering / QC steps that they perform in Servier
+    return adata, adata_filtered.var_names
 
 
 def split_dataset(
