@@ -1,8 +1,11 @@
 """Pseudobulk benchmark."""
 # %%
 import scanpy as sc
+import pandas as pd
+import anndata as ad
 import warnings
 from loguru import logger
+from sklearn.linear_model import LinearRegression
 
 from constants import (
     BENCHMARK_DATASET,
@@ -14,6 +17,7 @@ from constants import (
     GENERATIVE_MODELS,
     BASELINES,
     N_CELLS,
+    COMPUTE_SC_RESULTS_WHEN_FACS,
 )
 
 from benchmark_utils import (
@@ -28,11 +32,15 @@ from benchmark_utils import (
     add_cell_types_grouped,
     run_purified_sanity_check,
     run_sanity_check,
+    create_latent_signature,
+    compute_correlations,
+    compute_group_correlations,
     plot_purified_deconv_results,
     plot_deconv_results,
     plot_deconv_results_group,
     plot_deconv_lineplot,
 )
+from benchmark_utils.dataset_utils import create_anndata_pseudobulk
 
 # %% Load scRNAseq dataset
 logger.info(f"Loading single-cell dataset: {BENCHMARK_DATASET} ...")
@@ -112,7 +120,7 @@ if GENERATIVE_MODELS != []:
         generative_models["DestVI"] = destvi_model
 
     # 3. MixupVI
-    if "MixupVI" in GENERATIVE_MODELS:
+    if "MixUpVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_{N_GENES}_mixupvi.pkl"
         mixupvi_model = fit_mixupvi(adata_train[:,filtered_genes].copy(),
@@ -122,57 +130,166 @@ if GENERATIVE_MODELS != []:
                                     )
         generative_models["MixupVI"] = mixupvi_model
 
+# %% FACS
+
+if BENCHMARK_CELL_TYPE_GROUP == "FACS_1st_level_granularity":
+    logger.info("Computing FACS results...")
+
+    # Load data
+    facs_results = pd.read_csv(
+        "/home/owkin/project/bulk_facs/240214_majorCelltypes.csv", index_col=0
+    ).drop(["No.B.Cells.in.Live.Cells","NKT.Cells.in.Live.Cells"],axis=1).set_index("Sample")
+    facs_results = facs_results.rename(
+        {
+            "B.Cells.in.Live.Cells":"B",
+            "NK.Cells.in.Live.Cells":"NK",
+            "T.Cells.in.Live.Cells":"T",
+            "Monocytes.in.Live.Cells":"Mono",
+            "Dendritic.Cells.in.Live.Cells":"DC",
+        }, axis=1
+    )
+    facs_results = facs_results.dropna()
+    bulk_data = pd.read_csv(
+        (
+        "/home/owkin/project/bulk_facs/"
+        "gene_counts20230103_batch1-5_all_cleaned-TPMnorm-allpatients.tsv"
+        ), 
+        sep="\t",
+        index_col=0
+    ).T
+    common_samples = pd.read_csv(
+        "/home/owkin/project/bulk_facs/RNA-FACS_common-samples.csv", index_col=0
+    )
+
+    # Align bulk and facs samples
+    common_facs = common_samples.set_index("FACS.ID")["Patient"]
+    facs_results = facs_results.loc[facs_results.index.isin(common_facs.keys())]
+    facs_results = facs_results.rename(index=common_facs)
+    common_bulk = common_samples.set_index("RNAseq_ID")["Patient"]
+    bulk_data = bulk_data.loc[bulk_data.index.isin(common_bulk.keys())]
+    bulk_data = bulk_data.rename(index=common_bulk)
+    bulk_data = bulk_data.loc[facs_results.index].T
+
+
+    ### Most of the following is repeated from the sanity checks fct, so move this code there
+    df_test_correlations = pd.DataFrame(
+        index=bulk_data.columns,
+        columns=["nnls", "MixUpVI"]
+    )
+    df_test_group_correlations = pd.DataFrame(
+        index=facs_results.columns,
+        columns=["nnls", "MixUpVI"]
+    )
+    
+    # NNLS
+    deconv = LinearRegression(positive=True).fit(
+        signature, bulk_data.loc[signature.index]
+    )
+    deconv_results = pd.DataFrame(
+        deconv.coef_, index=bulk_data.columns, columns=signature.columns
+    )
+    deconv_results = deconv_results.div(
+        deconv_results.sum(axis=1), axis=0
+    )  # to sum up to 1
+    correlations = compute_correlations(deconv_results, facs_results)
+    group_correlations = compute_group_correlations(deconv_results, facs_results)
+    df_test_correlations.loc[:, "nnls"] = correlations.values
+    df_test_group_correlations.loc[:, "nnls"] = group_correlations.values
+
+    # MixUpVI
+    bulk_mixupvi = bulk_data.loc[filtered_genes]
+    model = "MixupVI"
+    adata_latent_signature = create_latent_signature(
+        adata=adata_train[:,filtered_genes],
+        model=generative_models[model],
+        use_mixupvi=False, # should be equal to use_mixupvi, but if True, 
+        # then it averages as many cells as self.n_cells_per-pseudobulk from mixupvae 
+        # (and not the number we wish in the benchmark)
+        average_all_cells = True,
+    )
+
+    adata_bulk = create_anndata_pseudobulk(
+        adata=adata_train[:,filtered_genes], x=bulk_mixupvi.T.values
+    )
+    latent_bulk = generative_models[model].get_latent_representation(
+        adata_bulk, get_pseudobulk=False
+    )
+    deconv = LinearRegression(positive=True).fit(adata_latent_signature.X.T,
+                                                 latent_bulk.T)
+    deconv_results = pd.DataFrame(
+        deconv.coef_, index=bulk_data.columns, columns=signature.columns
+    )
+    deconv_results = deconv_results.div(
+        deconv_results.sum(axis=1), axis=0
+    )  # to sum up to 1
+    correlations = compute_correlations(deconv_results, facs_results)
+    group_correlations = compute_group_correlations(deconv_results, facs_results)
+    df_test_correlations.loc[:, "MixupVI"] = correlations.values
+    df_test_group_correlations.loc[:, "MixupVI"] = group_correlations.values
+
+    # Plots
+    plot_deconv_results(df_test_correlations,
+                        save=True,
+                        filename="facs_1st_try")
+    plot_deconv_results_group(df_test_group_correlations,
+                              save=True,
+                              filename="facs_1st_try_cell_type")
+
 # %% Sanity check 3
 
-results = {}
-results_group = {}
+if (
+    (BENCHMARK_CELL_TYPE_GROUP != "FACS_1st_level_granularity") or
+    (BENCHMARK_CELL_TYPE_GROUP == "FACS_1st_level_granularity" and COMPUTE_SC_RESULTS_WHEN_FACS)
+):
+    results = {}
+    results_group = {}
 
-for n in N_CELLS:
-    logger.info(f"Pseudobulk simulation with {n} sampled cells ...")
-    all_adata_samples_test, adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
-        adata_test,
-        prior_alphas = None,
-        n_sample = N_SAMPLES,
-        n_cells = n,
-        add_sparsity=False # useless in the current modifications
-    )
-    # decomment following for Sanity check 2.
-    # adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_uniform_pseudobulk_dataset(
-    #     adata_test,
-    #     n_sample = N_SAMPLES,
-    #     n_cells = n,
-    # )
+    for n in N_CELLS:
+        logger.info(f"Pseudobulk simulation with {n} sampled cells ...")
+        all_adata_samples_test, adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
+            adata_test,
+            prior_alphas = None,
+            n_sample = N_SAMPLES,
+            n_cells = n,
+            add_sparsity=False # useless in the current modifications
+        )
+        # decomment following for Sanity check 2.
+        # adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_uniform_pseudobulk_dataset(
+        #     adata_test,
+        #     n_sample = N_SAMPLES,
+        #     n_cells = n,
+        # )
 
-    df_test_correlations, df_test_group_correlations = run_sanity_check(
-        adata_train=adata_train,
-        adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
-        adata_pseudobulk_test_rc=adata_pseudobulk_test_rc,
-        all_adata_samples_test=all_adata_samples_test,
-        filtered_genes=filtered_genes,
-        df_proportions_test=df_proportions_test,
-        signature=signature,
-        generative_models=generative_models,
-        baselines=BASELINES,
-    )
+        df_test_correlations, df_test_group_correlations = run_sanity_check(
+            adata_train=adata_train,
+            adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
+            adata_pseudobulk_test_rc=adata_pseudobulk_test_rc,
+            all_adata_samples_test=all_adata_samples_test,
+            filtered_genes=filtered_genes,
+            df_proportions_test=df_proportions_test,
+            signature=signature,
+            generative_models=generative_models,
+            baselines=BASELINES,
+        )
 
-    results[n] = df_test_correlations
-    results_group[n] = df_test_group_correlations
+        results[n] = df_test_correlations
+        results_group[n] = df_test_group_correlations
 
-# %% Plots
-if len(results) > 1:
-    plot_deconv_lineplot(results,
-                        save=True,
-                        filename=f"lineplot_tuned_mixupvi_third_granularity_retry_normal")
-else:
-    key = list(results.keys())[0]
-    plot_deconv_results(results[key],
-                        save=True,
-                        # filename=f"benchmark_{key}_cells_first_granularity")
-                        filename="test_first_type")
-    plot_deconv_results_group(results_group[key],
-                                save=True,
-                                # filename=f"benchmark_{key}_cells_first_granularity_cell_type")
-                                filename="test_first_type_cell_type")
+    # %% Plots
+    if len(results) > 1:
+        plot_deconv_lineplot(results,
+                            save=True,
+                            filename=f"lineplot_tuned_mixupvi_third_granularity_retry_normal")
+    else:
+        key = list(results.keys())[0]
+        plot_deconv_results(results[key],
+                            save=True,
+                            # filename=f"benchmark_{key}_cells_first_granularity")
+                            filename="test_first_type")
+        plot_deconv_results_group(results_group[key],
+                                    save=True,
+                                    # filename=f"benchmark_{key}_cells_first_granularity_cell_type")
+                                    filename="test_first_type_cell_type")
 
 
 # %% (Optional) Sanity check 1.
