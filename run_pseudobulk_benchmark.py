@@ -73,6 +73,47 @@ elif BENCHMARK_DATASET == "CTI_PROCESSED":
     )
     # adata_filtered = sc.read(f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
 
+if BENCHMARK_CELL_TYPE_GROUP == "FACS_1st_level_granularity":
+
+    # Load data
+    facs_results = pd.read_csv(
+        "/home/owkin/project/bulk_facs/240214_majorCelltypes.csv", index_col=0
+    ).drop(["No.B.Cells.in.Live.Cells","NKT.Cells.in.Live.Cells"],axis=1).set_index("Sample")
+    facs_results = facs_results.rename(
+        {
+            "B.Cells.in.Live.Cells":"B",
+            "NK.Cells.in.Live.Cells":"NK",
+            "T.Cells.in.Live.Cells":"T",
+            "Monocytes.in.Live.Cells":"Mono",
+            "Dendritic.Cells.in.Live.Cells":"DC",
+        }, axis=1
+    )
+    facs_results = facs_results.dropna()
+    bulk_data = pd.read_csv(
+        (
+        "/home/owkin/project/bulk_facs/"
+        "gene_counts_batchs1-5_raw.csv"
+        # "gene_counts20230103_batch1-5_all_cleaned-TPMnorm-allpatients.tsv"
+        ), 
+        index_col=0,
+        # sep="\t"
+    ).T
+    common_samples = pd.read_csv(
+        "/home/owkin/project/bulk_facs/RNA-FACS_common-samples.csv", index_col=0
+    )
+
+    # Align bulk and facs samples
+    common_facs = common_samples.set_index("FACS.ID")["Patient"]
+    facs_results = facs_results.loc[facs_results.index.isin(common_facs.keys())]
+    facs_results = facs_results.rename(index=common_facs)
+    common_bulk = common_samples.set_index("RNAseq_ID")["Patient"]
+    bulk_data = bulk_data.loc[bulk_data.index.isin(common_bulk.keys())]
+    bulk_data = bulk_data.rename(index=common_bulk)
+    bulk_data = bulk_data.loc[facs_results.index].T
+
+    # Intersect the filtered genes with the bulk data
+    filtered_genes = list(set(filtered_genes).intersection(bulk_data.index))
+
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {BENCHMARK_CELL_TYPE_GROUP}...")
 signature = create_signature(signature_type=SIGNATURE_CHOICE)
@@ -131,45 +172,8 @@ if GENERATIVE_MODELS != []:
         generative_models["MixupVI"] = mixupvi_model
 
 # %% FACS
-
 if BENCHMARK_CELL_TYPE_GROUP == "FACS_1st_level_granularity":
     logger.info("Computing FACS results...")
-
-    # Load data
-    facs_results = pd.read_csv(
-        "/home/owkin/project/bulk_facs/240214_majorCelltypes.csv", index_col=0
-    ).drop(["No.B.Cells.in.Live.Cells","NKT.Cells.in.Live.Cells"],axis=1).set_index("Sample")
-    facs_results = facs_results.rename(
-        {
-            "B.Cells.in.Live.Cells":"B",
-            "NK.Cells.in.Live.Cells":"NK",
-            "T.Cells.in.Live.Cells":"T",
-            "Monocytes.in.Live.Cells":"Mono",
-            "Dendritic.Cells.in.Live.Cells":"DC",
-        }, axis=1
-    )
-    facs_results = facs_results.dropna()
-    bulk_data = pd.read_csv(
-        (
-        "/home/owkin/project/bulk_facs/"
-        "gene_counts20230103_batch1-5_all_cleaned-TPMnorm-allpatients.tsv"
-        ), 
-        sep="\t",
-        index_col=0
-    ).T
-    common_samples = pd.read_csv(
-        "/home/owkin/project/bulk_facs/RNA-FACS_common-samples.csv", index_col=0
-    )
-
-    # Align bulk and facs samples
-    common_facs = common_samples.set_index("FACS.ID")["Patient"]
-    facs_results = facs_results.loc[facs_results.index.isin(common_facs.keys())]
-    facs_results = facs_results.rename(index=common_facs)
-    common_bulk = common_samples.set_index("RNAseq_ID")["Patient"]
-    bulk_data = bulk_data.loc[bulk_data.index.isin(common_bulk.keys())]
-    bulk_data = bulk_data.rename(index=common_bulk)
-    bulk_data = bulk_data.loc[facs_results.index].T
-
 
     ### Most of the following is repeated from the sanity checks fct, so move this code there
     df_test_correlations = pd.DataFrame(
@@ -182,11 +186,12 @@ if BENCHMARK_CELL_TYPE_GROUP == "FACS_1st_level_granularity":
     )
     
     # NNLS
+    intersected_signature = signature.loc[signature.index.intersection(bulk_data.index)]
     deconv = LinearRegression(positive=True).fit(
-        signature, bulk_data.loc[signature.index]
+        intersected_signature, bulk_data.loc[intersected_signature.index]
     )
     deconv_results = pd.DataFrame(
-        deconv.coef_, index=bulk_data.columns, columns=signature.columns
+        deconv.coef_, index=bulk_data.columns, columns=intersected_signature.columns
     )
     deconv_results = deconv_results.div(
         deconv_results.sum(axis=1), axis=0

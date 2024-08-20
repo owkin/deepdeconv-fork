@@ -24,7 +24,7 @@ else:
 BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
 N_CELLS = [100] # list of number of cells to try for the lineplot
-GENERATIVE_MODELS = ["MixupVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
+GENERATIVE_MODELS = ["MixUpVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
 BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
 COMPUTE_SC_RESULTS_WHEN_FACS = True
 
