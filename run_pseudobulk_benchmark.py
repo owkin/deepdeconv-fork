@@ -54,7 +54,8 @@ elif BENCHMARK_DATASET == "CTI":
         adata = preprocess_scrna(adata,
                         keep_genes=N_GENES,
                         batch_key=BATCH_KEY)
-    filterd_genes = adata.var.index[adata.var["highly_variable"]].tolist()
+        adata.write(cti_path)
+    filtered_genes = adata.var.index[adata.var["highly_variable"]].tolist()
 elif BENCHMARK_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
@@ -84,7 +85,7 @@ if GENERATIVE_MODELS != []:
     if "scVI" in GENERATIVE_MODELS:
         logger.info("Fit scVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_scvi.pkl"
-        scvi_model = fit_scvi(adata_train[:, filterd_genes].copy(),
+        scvi_model = fit_scvi(adata_train[:, filtered_genes].copy(),
                               model_path,
                               save_model=SAVE_MODEL)
         generative_models["scVI"] = scvi_model
@@ -103,7 +104,7 @@ if GENERATIVE_MODELS != []:
 
         model_path_1 = f"project/models/{BENCHMARK_DATASET}_condscvi.pkl"
         model_path_2 = f"project/models/{BENCHMARK_DATASET}_destvi.pkl"
-        condscvi_model , destvi_model= fit_destvi(adata_train[:, filterd_genes].copy(),
+        condscvi_model , destvi_model= fit_destvi(adata_train[:, filtered_genes].copy(),
                                                 adata_pseudobulk_train_counts,
                                                 model_path_1,
                                                 model_path_2,
@@ -116,7 +117,7 @@ if GENERATIVE_MODELS != []:
     if "MixupVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_{N_GENES}_mixupvi.pkl"
-        mixupvi_model = fit_mixupvi(adata_train[:, filterd_genes].copy(),
+        mixupvi_model = fit_mixupvi(adata_train[:, filtered_genes].copy(),
                                     model_path,
                                     cell_type_group="cell_types_grouped",
                                     save_model=SAVE_MODEL,
