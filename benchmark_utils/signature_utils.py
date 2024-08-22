@@ -6,29 +6,33 @@ import mygene
 
 
 def create_signature(
-    adata: ad.AnnData,
     signature_type: str = "crosstissue_general",
 ):
     """Create the signature matrix from the single cell dataset."""
     if signature_type == "laughney":
-        signature = pd.read_csv(
-            "/home/owkin/project/laughney_signature.csv", index_col=0
-        ).drop(["Endothelial", "Malignant", "Stroma", "Epithelial"], axis=1)
-        # map the HGNC notation to ENSG if the signature matrix uses HGNC notation
-        mg = mygene.MyGeneInfo()
-        genes = mg.querymany(
-            signature.index,
-            scopes="symbol",
-            fields=["ensembl"],
-            species="human",
-            verbose=False,
-            as_dataframe=True,
+        raise NotImplementedError(
+            "Laughney signature not available now. To solve, upload it directly with "
+            "ENSG names."
         )
-        ensg_names = map_hgnc_to_ensg(genes, adata)
-        signature.index = ensg_names
+        # signature = pd.read_csv(
+        #     "/home/owkin/project/laughney_signature.csv", index_col=0
+        # ).drop(["Endothelial", "Malignant", "Stroma", "Epithelial"], axis=1)
+        # # map the HGNC notation to ENSG if the signature matrix uses HGNC notation
+        # mg = mygene.MyGeneInfo()
+        # genes = mg.querymany(
+        #     signature.index,
+        #     scopes="symbol",
+        #     fields=["ensembl"],
+        #     species="human",
+        #     verbose=False,
+        #     as_dataframe=True,
+        # )
+        # ensg_names = map_hgnc_to_ensg(genes, adata)
+        # signature.index = ensg_names
     elif signature_type == "CTI_1st_level_granularity":
         signature = read_txt_r_signature(
             "/home/owkin/project/Almudena/Output/Crosstiss_Immune_norm/CTI.txt"
+            # "/home/owkin/project/Almudena/Output/Crosstiss_Immune/CTI.txt"
         )  # it is the normalised one (using adata.X and not adata.raw.X)
     elif signature_type == "CTI_2nd_level_granularity":
         signature = read_txt_r_signature(
@@ -46,10 +50,7 @@ def create_signature(
         signature = read_txt_r_signature(
             "/home/owkin/project/Simon/signature_FACS_1st_level_granularity/FACS_1st_level_granularity_ensg.txt"
         )
-    # intersection between all genes and marker genes
-    intersection = list(set(adata.var_names).intersection(signature.index))
-    signature = signature.loc[intersection]
-    return signature, intersection
+    return signature
 
 
 def read_txt_r_signature(path):

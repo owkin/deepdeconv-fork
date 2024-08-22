@@ -1,9 +1,12 @@
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import pandas as pd
 
 from typing import Dict
+from datetime import datetime
+from loguru import logger
 
 def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
@@ -106,7 +109,14 @@ def plot_deconv_lineplot(results: Dict[int, pd.DataFrame],
     plt.show()
 
     if save:
-        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+        path = f"/home/owkin/project/plots/{filename}.png"
+        if os.path.isfile(path):
+            new_path = f"/home/owkin/project/plots/{filename}_{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}.png"
+            logger.warning(f"{path} already exists. Saving file on this path instead: {new_path}")
+            path = new_path
+        plt.savefig(path, dpi=300)
+        logger.info(f"Plot saved to the following path: {path}")
+
 
 def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
     """Plot the train or val metrics from training."""
@@ -241,6 +251,12 @@ def compare_tuning_results(
     
     custom_palette = sns.color_palette("husl", n_colors=len(all_results[variable_tuned].unique()))
     all_results["epoch"] = all_results.index
+    if (n_nan := all_results[variable_to_plot].isna().sum()) > 0:
+        print(
+            f"There are {n_nan} missing values in the variable to plot ({variable_to_plot})."
+            "Filling them with the next row values."
+        )
+        all_results[variable_to_plot] = all_results[variable_to_plot].fillna(method='bfill')
     sns.set_theme(style="darkgrid")
     sns.lineplot(x="epoch", y=variable_to_plot, hue=variable_tuned, ci="sd", data=all_results, err_style="bars", palette=custom_palette)
     plt.show()

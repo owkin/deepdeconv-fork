@@ -1,8 +1,9 @@
 """Pseudobulk benchmark."""
 # %%
 import scanpy as sc
-from loguru import logger
+import os
 import warnings
+from loguru import logger
 
 from constants import (
     BENCHMARK_DATASET,
@@ -13,21 +14,23 @@ from constants import (
     N_SAMPLES,
     GENERATIVE_MODELS,
     BASELINES,
+    N_CELLS,
+    BATCH_KEY
 )
 
 from benchmark_utils import (
     preprocess_scrna,
-    create_purified_pseudobulk_dataset,
-    create_uniform_pseudobulk_dataset,
+    # create_purified_pseudobulk_dataset,
+    # create_uniform_pseudobulk_dataset,
     create_dirichlet_pseudobulk_dataset,
     fit_scvi,
     fit_destvi,
     fit_mixupvi,
     create_signature,
     add_cell_types_grouped,
-    run_purified_sanity_check,
+    # run_purified_sanity_check,
     run_sanity_check,
-    plot_purified_deconv_results,
+    # plot_purified_deconv_results,
     plot_deconv_results,
     plot_deconv_results_group,
     plot_deconv_lineplot,
@@ -43,28 +46,30 @@ if BENCHMARK_DATASET == "TOY":
     # adata = scvi.data.heart_cell_atlas_subsampled()
     # preprocess_scrna(adata, keep_genes=1200)
 elif BENCHMARK_DATASET == "CTI":
-    adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
-    preprocess_scrna(adata,
-                     keep_genes=N_GENES,
-                     batch_key="donor_id")
+    cti_path = f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad"
+    if os.path.exists(cti_path):
+        adata = sc.read(f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
+    else:
+        adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
+        adata = preprocess_scrna(adata,
+                        keep_genes=N_GENES,
+                        batch_key=BATCH_KEY)
+        adata.write(cti_path)
+    filtered_genes = adata.var.index[adata.var["highly_variable"]].tolist()
 elif BENCHMARK_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
-    preprocess_scrna(adata,
+    adata = preprocess_scrna(adata,
                      keep_genes=N_GENES,
                      batch_key="donor_id",
     )
-elif BENCHMARK_DATASET == "CTI_PROCESSED":
-    # Load processed for speed-up (already filtered, normalised, etc.)
-    adata = sc.read(f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
+    #save adata
+    adata.write(f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
 
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {BENCHMARK_CELL_TYPE_GROUP}...")
-signature, intersection = create_signature(
-    adata,
-    signature_type=SIGNATURE_CHOICE,
-)
+signature = create_signature(signature_type=SIGNATURE_CHOICE)
 
 # %% add cell types groups and split train/test
 adata, train_test_index = add_cell_types_grouped(adata, BENCHMARK_CELL_TYPE_GROUP)
@@ -80,7 +85,7 @@ if GENERATIVE_MODELS != []:
     if "scVI" in GENERATIVE_MODELS:
         logger.info("Fit scVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_scvi.pkl"
-        scvi_model = fit_scvi(adata_train,
+        scvi_model = fit_scvi(adata_train[:, filtered_genes].copy(),
                               model_path,
                               save_model=SAVE_MODEL)
         generative_models["scVI"] = scvi_model
@@ -94,12 +99,12 @@ if GENERATIVE_MODELS != []:
         # )
         # Dirichlet
         adata_pseudobulk_train_counts, adata_pseudobulk_train_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
-            adata_train, prior_alphas = None, n_sample = N_SAMPLES,
+            adata_train.copy(), prior_alphas = None, n_sample = N_SAMPLES,
         )
 
         model_path_1 = f"project/models/{BENCHMARK_DATASET}_condscvi.pkl"
         model_path_2 = f"project/models/{BENCHMARK_DATASET}_destvi.pkl"
-        condscvi_model , destvi_model= fit_destvi(adata_train,
+        condscvi_model , destvi_model= fit_destvi(adata_train[:, filtered_genes].copy(),
                                                 adata_pseudobulk_train_counts,
                                                 model_path_1,
                                                 model_path_2,
@@ -112,7 +117,7 @@ if GENERATIVE_MODELS != []:
     if "MixupVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_{N_GENES}_mixupvi.pkl"
-        mixupvi_model = fit_mixupvi(adata_train,
+        mixupvi_model = fit_mixupvi(adata_train[:, filtered_genes].copy(),
                                     model_path,
                                     cell_type_group="cell_types_grouped",
                                     save_model=SAVE_MODEL,
@@ -121,14 +126,10 @@ if GENERATIVE_MODELS != []:
 
 # %% Sanity check 3
 
-#num_cells = [50, 100, 300, 500, 1000]
-
-num_cells = [2000]
-
 results = {}
 results_group = {}
 
-for n in num_cells:
+for n in N_CELLS:
     logger.info(f"Pseudobulk simulation with {n} sampled cells ...")
     all_adata_samples_test, adata_pseudobulk_test_counts, adata_pseudobulk_test_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
         adata_test,
@@ -151,7 +152,6 @@ for n in num_cells:
         all_adata_samples_test=all_adata_samples_test,
         df_proportions_test=df_proportions_test,
         signature=signature,
-        intersection=intersection,
         generative_models=generative_models,
         baselines=BASELINES,
     )
@@ -163,15 +163,17 @@ for n in num_cells:
 if len(results) > 1:
     plot_deconv_lineplot(results,
                         save=True,
-                        filename=f"sim_pseudobulk_lineplot")
+                        filename=f"lineplot_tuned_mixupvi_third_granularity_retry_normal")
 else:
     key = list(results.keys())[0]
     plot_deconv_results(results[key],
                         save=True,
-                        filename=f"sim_pseudobulk_{key}")
+                        # filename=f"benchmark_{key}_cells_first_granularity")
+                        filename="test_first_type")
     plot_deconv_results_group(results_group[key],
                                 save=True,
-                                filename=f"sim_pseudobulk_{key}_per_celltype")
+                                # filename=f"benchmark_{key}_cells_first_granularity_cell_type")
+                                filename="test_first_type_cell_type")
 
 
 # %% (Optional) Sanity check 1.
@@ -184,7 +186,6 @@ else:
 #     adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
 #     adata_pseudobulk_test_rc=adata_pseudobulk_test_rc,
 #     signature=signature,
-#     intersection=intersection,
 #     generative_models=generative_models,
 #     baselines=BASELINES,
 # )

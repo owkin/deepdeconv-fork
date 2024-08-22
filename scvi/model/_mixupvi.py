@@ -52,7 +52,7 @@ class MixUpVI(SCVI):
         self,
         adata: Optional[AnnData] = None,
         indices: Optional[Sequence[int]] = None,
-        get_pseudobulk: bool = True,
+        get_pseudobulk: bool = False,
         give_mean: bool = True,
         mc_samples: int = 5000,
         batch_size: Optional[int] = None,
