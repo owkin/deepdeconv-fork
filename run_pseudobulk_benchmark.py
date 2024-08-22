@@ -1,6 +1,7 @@
 """Pseudobulk benchmark."""
 # %%
 import scanpy as sc
+import os
 import warnings
 from loguru import logger
 
@@ -14,21 +15,22 @@ from constants import (
     GENERATIVE_MODELS,
     BASELINES,
     N_CELLS,
+    BATCH_KEY
 )
 
 from benchmark_utils import (
     preprocess_scrna,
-    create_purified_pseudobulk_dataset,
-    create_uniform_pseudobulk_dataset,
+    # create_purified_pseudobulk_dataset,
+    # create_uniform_pseudobulk_dataset,
     create_dirichlet_pseudobulk_dataset,
     fit_scvi,
     fit_destvi,
     fit_mixupvi,
     create_signature,
     add_cell_types_grouped,
-    run_purified_sanity_check,
+    # run_purified_sanity_check,
     run_sanity_check,
-    plot_purified_deconv_results,
+    # plot_purified_deconv_results,
     plot_deconv_results,
     plot_deconv_results_group,
     plot_deconv_lineplot,
@@ -44,26 +46,25 @@ if BENCHMARK_DATASET == "TOY":
     # adata = scvi.data.heart_cell_atlas_subsampled()
     # preprocess_scrna(adata, keep_genes=1200)
 elif BENCHMARK_DATASET == "CTI":
-    adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
-    adata, filtered_genes = preprocess_scrna(adata,
-                     keep_genes=N_GENES,
-                     batch_key="donor_id")
+    cti_path = f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad"
+    if os.path.exists(cti_path):
+        adata = sc.read(f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
+    else:
+        adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
+        adata = preprocess_scrna(adata,
+                        keep_genes=N_GENES,
+                        batch_key=BATCH_KEY)
+
 elif BENCHMARK_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
     adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
-    adata, filtered_genes = preprocess_scrna(adata,
+    adata = preprocess_scrna(adata,
                      keep_genes=N_GENES,
                      batch_key="donor_id",
     )
-elif BENCHMARK_DATASET == "CTI_PROCESSED":
-    # Load processed for speed-up (already filtered, normalised, etc.)
-    raise NotImplementedError(
-        "Not possible to use a CTI_PROCESSED dataset because we would need the "
-        "not-filtered adata to be processed as well. To solve: separate the "
-        "preprocessing function between normalization and filtering parts."
-    )
-    # adata_filtered = sc.read(f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
+    #save adata
+    adata.write(f"/home/owkin/data/cti_data/processed/cti_processed_{N_GENES}.h5ad")
 
 # %% load signature
 logger.info(f"Loading signature matrix: {SIGNATURE_CHOICE} | {BENCHMARK_CELL_TYPE_GROUP}...")
@@ -77,13 +78,13 @@ adata_test = adata[train_test_index["Test index"]]
 # %% Create and train generative models
 generative_models = {}
 if GENERATIVE_MODELS != []:
-    adata_train = adata_train.copy()
-    adata_test = adata_test.copy()
+    # adata_train = adata_train.copy()
+    # adata_test = adata_test.copy()
     # 1. scVI
     if "scVI" in GENERATIVE_MODELS:
         logger.info("Fit scVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_scvi.pkl"
-        scvi_model = fit_scvi(adata_train[:,filtered_genes].copy(),
+        scvi_model = fit_scvi(adata_train,
                               model_path,
                               save_model=SAVE_MODEL)
         generative_models["scVI"] = scvi_model
@@ -97,12 +98,12 @@ if GENERATIVE_MODELS != []:
         # )
         # Dirichlet
         adata_pseudobulk_train_counts, adata_pseudobulk_train_rc, df_proportions_test = create_dirichlet_pseudobulk_dataset(
-            adata_train[:,filtered_genes].copy(), prior_alphas = None, n_sample = N_SAMPLES,
+            adata_train.copy(), prior_alphas = None, n_sample = N_SAMPLES,
         )
 
         model_path_1 = f"project/models/{BENCHMARK_DATASET}_condscvi.pkl"
         model_path_2 = f"project/models/{BENCHMARK_DATASET}_destvi.pkl"
-        condscvi_model , destvi_model= fit_destvi(adata_train[:,filtered_genes].copy(),
+        condscvi_model , destvi_model= fit_destvi(adata_train,
                                                 adata_pseudobulk_train_counts,
                                                 model_path_1,
                                                 model_path_2,
@@ -115,7 +116,7 @@ if GENERATIVE_MODELS != []:
     if "MixupVI" in GENERATIVE_MODELS:
         logger.info("Train mixupVI ...")
         model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_{N_GENES}_mixupvi.pkl"
-        mixupvi_model = fit_mixupvi(adata_train[:,filtered_genes].copy(),
+        mixupvi_model = fit_mixupvi(adata_train,
                                     model_path,
                                     cell_type_group="cell_types_grouped",
                                     save_model=SAVE_MODEL,
@@ -148,7 +149,6 @@ for n in N_CELLS:
         adata_pseudobulk_test_counts=adata_pseudobulk_test_counts,
         adata_pseudobulk_test_rc=adata_pseudobulk_test_rc,
         all_adata_samples_test=all_adata_samples_test,
-        filtered_genes=filtered_genes,
         df_proportions_test=df_proportions_test,
         signature=signature,
         generative_models=generative_models,

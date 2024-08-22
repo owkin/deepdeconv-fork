@@ -37,7 +37,7 @@ from .signature_utils import (
     map_hgnc_to_ensg,
 )
 from .sanity_checks_utils import (
-    run_purified_sanity_check,
+    # run_purified_sanity_check,
     run_sanity_check,
 )
 from .tuning_utils import(

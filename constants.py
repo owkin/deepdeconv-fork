@@ -21,7 +21,8 @@ elif SIGNATURE_CHOICE == "FACS_1st_level_granularity":
     BENCHMARK_CELL_TYPE_GROUP = "FACS_1st_level_granularity"
 else:
     BENCHMARK_CELL_TYPE_GROUP = None # no signature was created
-BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_RAW"]
+BATCH_KEY = "donor_id"
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
 N_CELLS = [2000] # list of number of cells to try for the lineplot
 GENERATIVE_MODELS = ["MixupVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
@@ -37,14 +38,14 @@ MAX_EPOCHS = 100
 ## Other constants to tune and then fix
 N_GENES = 2000 # number of input genes after preprocessing
 # MixUpVI training hyperparameters
-BATCH_SIZE = 1024
+BATCH_SIZE = 2048
 TRAIN_SIZE = 0.7 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI model hyperparameters
 N_PSEUDOBULKS = 100
-N_CELLS_PER_PSEUDOBULK = 256 # None (then will be batch size) or int (will cap at batch size)
+N_CELLS_PER_PSEUDOBULK = 512 # None (then will be batch size) or int (will cap at batch size)
 N_HIDDEN = 512
 CONT_COV = None  # None or list of continuous covariates to include
 CAT_COV = None # None or ["donor_id", "assay"]
@@ -134,7 +135,7 @@ GROUPS = {
         "MemB": [ "Memory B cells"],
         "Plasma": ["Plasma cells", "Plasmablasts"],
         "Mono": ["Classical monocytes", "Nonclassical monocytes"],
-        "Macro":["Alveolar macrophages","Erythrophagocytic macrophages", 
+        "Macro":["Alveolar macrophages","Erythrophagocytic macrophages",
                  "Intermediate macrophages", "Intestinal macrophages"],
         "Naive_CD8T": [ "Tnaive/CM_CD8"],
         "Mem_CD8T": ["Tem/emra_CD8", "Trm/em_CD8", "Trm_gut_CD8"],
@@ -146,8 +147,8 @@ GROUPS = {
         "DC": ["DC1", "DC2", "migDC"],
         "pDC": ["pDC"],
         "Mast": ["Mast cells"],
-        "To remove": ["ABCs", "GC_B (I)", "GC_B (II)","Cycling", "T/B doublets", 
-                      "Cycling T&NK", "MNP/B doublets", "MNP/T doublets", "ILC3", 
+        "To remove": ["ABCs", "GC_B (I)", "GC_B (II)","Cycling", "T/B doublets",
+                      "Cycling T&NK", "MNP/B doublets", "MNP/T doublets", "ILC3",
                       "MAIT","T_CD4/CD8", "Erythroid", "Megakaryocytes", "Progenitor"],
 
     },
@@ -174,22 +175,22 @@ GROUPS = {
         "migDC": [ "migDC"],
         "pDC": ["pDC"],
         "Mast": ["Mast cells"],
-        "To remove": ["ABCs", "GC_B (I)", "GC_B (II)","Cycling", "T/B doublets", 
-                      "Cycling T&NK", "MNP/B doublets", "MNP/T doublets", "ILC3", 
+        "To remove": ["ABCs", "GC_B (I)", "GC_B (II)","Cycling", "T/B doublets",
+                      "Cycling T&NK", "MNP/B doublets", "MNP/T doublets", "ILC3",
                       "MAIT","T_CD4/CD8", "Erythroid", "Megakaryocytes", "Progenitor"],
     },
     "FACS_1st_level_granularity": {
         "B": ["Pre-B", "Pro-B", "Naive B cells","Memory B cells","Plasma cells"],
-        "NK": ["NK_CD16+", "NK_CD56bright_CD16-"],  
-        "T": [ "Tnaive/CM_CD8","Tem/emra_CD8", "Trm/em_CD8", "Trm_gut_CD8","Tfh", 
-              "Tnaive/CM_CD4", "Tnaive/CM_CD4_activated", "Teffector/EM_CD4", 
-              "Trm_Th1/Th17","Tregs","T_CD4/CD8","Tgd_CRTAM+", "Trm_Tgd","MAIT"], 
-        "Mono": ["Classical monocytes", "Nonclassical monocytes"], 
+        "NK": ["NK_CD16+", "NK_CD56bright_CD16-"],
+        "T": [ "Tnaive/CM_CD8","Tem/emra_CD8", "Trm/em_CD8", "Trm_gut_CD8","Tfh",
+              "Tnaive/CM_CD4", "Tnaive/CM_CD4_activated", "Teffector/EM_CD4",
+              "Trm_Th1/Th17","Tregs","T_CD4/CD8","Tgd_CRTAM+", "Trm_Tgd","MAIT"],
+        "Mono": ["Classical monocytes", "Nonclassical monocytes"],
         "DC": ["DC1", "DC2", "migDC", "pDC"],
-        "To remove":["Plasmablasts","ABCs", "GC_B (I)", "GC_B (II)","Cycling", 
+        "To remove":["Plasmablasts","ABCs", "GC_B (I)", "GC_B (II)","Cycling",
                      "T/B doublets", "Cycling T&NK", "MNP/B doublets", "MNP/T doublets",
                      "ILC3", "Erythroid", "Megakaryocytes", "Progenitor",
-                     "Alveolar macrophages","Erythrophagocytic macrophages", 
+                     "Alveolar macrophages","Erythrophagocytic macrophages",
                      "Intermediate macrophages", "Intestinal macrophages","Mast cells"]
     }
 }

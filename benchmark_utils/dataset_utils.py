@@ -14,24 +14,33 @@ from constants import GROUPS
 def preprocess_scrna(
     adata: ad.AnnData, keep_genes: int = 2000, batch_key: Optional[str] = None
 ):
-    """Preprocess single-cell RNA data for deconvolution benchmarking."""
+    """Preprocess single-cell RNA data for deconvolution benchmarking.
+
+    * in adata.X, the normalized log1p counts are saved
+    * in adata.layers["counts"], raw counts are saved
+    * in adata.layers["relative_counts"], the relative counts are saved
+    => The highly variable genes can be found in adata.var["highly_variable"]
+
+    """
     sc.pp.filter_genes(adata, min_counts=3)
     adata.layers["counts"] = adata.X.copy()  # preserve counts, used for training
     sc.pp.normalize_total(adata, target_sum=1e4)
-    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for
+    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for baselines
     sc.pp.log1p(adata)
     adata.raw = adata  # freeze the state in `.raw`
-    adata_filtered = adata.copy()
     sc.pp.highly_variable_genes(
-        adata_filtered,
+        adata,
         n_top_genes=keep_genes,
-        subset=True,
         layer="counts",
         flavor="seurat_v3",
         batch_key=batch_key,
+        subset=False,
+        inplace=True
     )
     #TODO: add the filtering / QC steps that they perform in Servier
-    return adata, adata_filtered.var_names
+    # concat the result df to adata.var
+
+    return adata
 
 
 def split_dataset(
