@@ -124,9 +124,7 @@ def create_latent_signature(
                         adata_sampled = create_anndata_pseudobulk(
                             adata_sampled, pseudobulk
                         )
-                    result = model.get_latent_representation(
-                        adata_sampled, get_pseudobulk = False
-                    )
+                    result = model.get_latent_representation(adata_sampled)
                     if SIGNATURE_TYPE == "pre_encoded":
                         result = result.reshape(-1)
                     elif SIGNATURE_TYPE == "post_inference":

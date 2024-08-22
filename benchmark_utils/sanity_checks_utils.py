@@ -106,7 +106,7 @@ def run_sanity_check(
     # 2. TAPE
     if "TAPE" in baselines:
         _, deconv_results = \
-        Deconvolution(signature.T, pseudobulk_test_df,
+        Deconvolution(signature.loc[intersection].T, pseudobulk_test_df,
                   sep='\t', scaler='mms',
                   datatype='counts', genelenfile=None,
                   mode='overall', adaptive=True, variance_threshold=0.98,
@@ -118,7 +118,7 @@ def run_sanity_check(
         df_test_group_correlations.loc[:, "TAPE"] = group_correlations.values
     ## 3. Scaden
     if "Scaden" in baselines:
-        deconv_results = ScadenDeconvolution(signature.T,
+        deconv_results = ScadenDeconvolution(signature.loc[intersection].T,
                                             pseudobulk_test_df,
                                             sep='\t',
                                             batch_size=128, epochs=128)
