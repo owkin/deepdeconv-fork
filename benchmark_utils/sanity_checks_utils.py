@@ -38,7 +38,6 @@ def run_sanity_check(
     adata_pseudobulk_test_counts: ad.AnnData,
     adata_pseudobulk_test_rc: ad.AnnData,
     all_adata_samples_test: List[ad.AnnData],
-    filtered_genes: list,
     df_proportions_test: pd.DataFrame,
     signature: pd.DataFrame,
     generative_models : Dict[str, Union[scvi.model.SCVI,
@@ -60,8 +59,6 @@ def run_sanity_check(
         pseudobulk RNA seq test dataset.
     adata_pseudobulk_test_rc: ad.AnnData
         pseudobulk RNA seq test dataset (relative counts).
-    filtered_genes: list
-        The most variable genes filtered, used for all methods except NNLS (can be challenged).
     signature: pd.DataFrame
         Signature matrix.
     generative_models: Dict[str, scvi.model]
