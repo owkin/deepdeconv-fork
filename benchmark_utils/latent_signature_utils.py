@@ -122,7 +122,7 @@ def create_latent_signature(
                             adata_sampled.layers[count_key].mean(axis=0).reshape(1, -1)
                         )
                         adata_sampled = create_anndata_pseudobulk(
-                            adata_sampled, pseudobulk
+                            adata_sampled.obs, adata_sampled.var_names, pseudobulk
                         )
                     result = model.get_latent_representation(
                         adata_sampled, get_pseudobulk = False

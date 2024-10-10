@@ -14,24 +14,33 @@ from constants import GROUPS
 def preprocess_scrna(
     adata: ad.AnnData, keep_genes: int = 2000, batch_key: Optional[str] = None
 ):
-    """Preprocess single-cell RNA data for deconvolution benchmarking."""
+    """Preprocess single-cell RNA data for deconvolution benchmarking.
+
+    * in adata.X, the normalized log1p counts are saved
+    * in adata.layers["counts"], raw counts are saved
+    * in adata.layers["relative_counts"], the relative counts are saved
+    => The highly variable genes can be found in adata.var["highly_variable"]
+
+    """
     sc.pp.filter_genes(adata, min_counts=3)
     adata.layers["counts"] = adata.X.copy()  # preserve counts, used for training
     sc.pp.normalize_total(adata, target_sum=1e4)
-    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for
+    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for baselines
     sc.pp.log1p(adata)
     adata.raw = adata  # freeze the state in `.raw`
-    adata_filtered = adata.copy()
     sc.pp.highly_variable_genes(
-        adata_filtered,
+        adata,
         n_top_genes=keep_genes,
-        subset=True,
         layer="counts",
         flavor="seurat_v3",
         batch_key=batch_key,
+        subset=False,
+        inplace=True
     )
     #TODO: add the filtering / QC steps that they perform in Servier
-    return adata, adata_filtered.var_names
+    # concat the result df to adata.var
+
+    return adata
 
 
 def split_dataset(
@@ -112,17 +121,21 @@ def add_cell_types_grouped(
     elif group == "FACS_1st_level_granularity":
         train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_facs_1st_level.csv", index_col=1).iloc[:,1:]
         col_name = "grouping"
-    adata.obs["cell_types_grouped"] = train_test_index[col_name]
+    adata.obs[f"cell_types_grouped_{group}"] = train_test_index[col_name]
     return adata, train_test_index
 
 
-def create_anndata_pseudobulk(adata: ad.AnnData, x: np.array) -> ad.AnnData:
+def create_anndata_pseudobulk(
+    adata_obs: pd.DataFrame, adata_var_names: list, x: np.array
+) -> ad.AnnData:
     """Creates an anndata object from a pseudobulk sample.
 
     Parameters
     ----------
-    adata: ad.AnnData
-        AnnData aobject storing training set
+    adata_obs: pd.DataFrame
+        Obs dataframe from anndata object storing training set
+    adata_var_names: list
+        Gene names from the anndata object
     x: np.array
         pseudobulk sample
 
@@ -132,14 +145,14 @@ def create_anndata_pseudobulk(adata: ad.AnnData, x: np.array) -> ad.AnnData:
         Anndata object storing the pseudobulk array
     """
     df_obs = pd.DataFrame.from_dict(
-        [{col: adata.obs[col].value_counts().index[0] for col in adata.obs.columns}]
+        [{col: adata_obs[col].value_counts().index[0] for col in adata_obs.columns}]
     )
     if len(x.shape) > 1 and x.shape[0] > 1:
         # several pseudobulks, so duplicate df_obs row
         df_obs = df_obs.loc[df_obs.index.repeat(x.shape[0])].reset_index(drop=True)
         df_obs.index = [f"sample_{idx}" for idx in df_obs.index]
     adata_pseudobulk = ad.AnnData(X=x, obs=df_obs)
-    adata_pseudobulk.var_names = adata.var_names
+    adata_pseudobulk.var_names = adata_var_names
     adata_pseudobulk.layers["counts"] = np.copy(x)
     adata_pseudobulk.raw = adata_pseudobulk
 
@@ -169,10 +182,10 @@ def create_purified_pseudobulk_dataset(
         group.append(group_key)
 
     # pseudobulk dataset
-    adata_pseudobulk_rc = create_anndata_pseudobulk(adata,
+    adata_pseudobulk_rc = create_anndata_pseudobulk(adata.obs, adata.var_names,
                                                     np.array(averaged_data["relative_counts"])
                                                     )
-    adata_pseudobulk_counts = create_anndata_pseudobulk(adata,
+    adata_pseudobulk_counts = create_anndata_pseudobulk(adata.obs, adata.var_names,
                                                     np.array(averaged_data["counts"])
                                                     )
     adata_pseudobulk_rc.obs_names = group
@@ -212,10 +225,10 @@ def create_uniform_pseudobulk_dataset(
             averaged_data["counts"].append(adata_sample.layers["counts"].sum(axis=0).tolist()[0])
 
     # pseudobulk dataset
-    adata_pseudobulk_rc = create_anndata_pseudobulk(adata,
+    adata_pseudobulk_rc = create_anndata_pseudobulk(adata.obs, adata.var_names,
                                                     np.array(averaged_data["relative_counts"])
                                                     )
-    adata_pseudobulk_counts = create_anndata_pseudobulk(adata,
+    adata_pseudobulk_counts = create_anndata_pseudobulk(adata.obs, adata.var_names,
                                                     np.array(averaged_data["counts"])
                                                     )
 
@@ -304,10 +317,10 @@ def create_dirichlet_pseudobulk_dataset(
         all_adata_samples.append(adata_sample)
 
     # pseudobulk dataset
-    adata_pseudobulk_rc = create_anndata_pseudobulk(adata,
+    adata_pseudobulk_rc = create_anndata_pseudobulk(adata.obs, adata.var_names,
                                                     np.array(averaged_data["relative_counts"])
                                                     )
-    adata_pseudobulk_counts = create_anndata_pseudobulk(adata,
+    adata_pseudobulk_counts = create_anndata_pseudobulk(adata.obs, adata.var_names,
                                                     np.array(averaged_data["counts"])
                                                     )
 
