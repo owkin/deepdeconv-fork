@@ -166,7 +166,7 @@ if GENERATIVE_MODELS != []:
         model_path = f"project/models/{BENCHMARK_DATASET}_{BENCHMARK_CELL_TYPE_GROUP}_{N_GENES}_mixupvi.pkl"
         mixupvi_model = fit_mixupvi(adata_train[:,filtered_genes].copy(),
                                     model_path,
-                                    cell_type_group="cell_types_grouped",
+                                    cell_type_group="cell_types_grouped", # TO CHANGE IN NEW BENCHMARK (f"cell_types_grouped_{granularity}")
                                     save_model=SAVE_MODEL,
                                     )
         generative_models["MixupVI"] = mixupvi_model
@@ -214,7 +214,7 @@ if BENCHMARK_CELL_TYPE_GROUP == "FACS_1st_level_granularity":
     )
 
     adata_bulk = create_anndata_pseudobulk(
-        adata=adata_train[:,filtered_genes], x=bulk_mixupvi.T.values
+        adata_train[:,filtered_genes].obs, filtered_genes, x=bulk_mixupvi.T.values
     )
     latent_bulk = generative_models[model].get_latent_representation(
         adata_bulk, get_pseudobulk=False
