@@ -7,6 +7,7 @@ from .deconv_utils import (
     create_random_proportion,
 )
 from .dataset_utils import (
+    create_anndata_pseudobulk,
     preprocess_scrna,
     split_dataset,
     create_new_granularity_index,

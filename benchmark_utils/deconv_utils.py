@@ -47,6 +47,7 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
                                                 scvi.model.MixUpVI,
                                                 scvi.model.CondSCVI]],
                           all_adata_samples,
+                          filtered_genes,
                           use_mixupvi: bool = True,
                           use_nnls: bool = True,
                           use_softmax: bool = False) -> pd.DataFrame:
@@ -74,7 +75,7 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
     if use_mixupvi:
         latent_pseudobulks=[]
         for i in range(len(all_adata_samples)):
-            latent_pseudobulks.append(model.get_latent_representation(all_adata_samples[i], get_pseudobulk=True))
+            latent_pseudobulks.append(model.get_latent_representation(all_adata_samples[i,filtered_genes], get_pseudobulk=True))
         latent_pseudobulk = np.concatenate(latent_pseudobulks, axis=0)
     else:
         adata_pseudobulk = ad.AnnData(X=adata_pseudobulk.layers["counts"],
@@ -82,7 +83,7 @@ def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
                                     var=adata_pseudobulk.var)
         adata_pseudobulk.layers["counts"] = adata_pseudobulk.X.copy()
 
-        latent_pseudobulk = model.get_latent_representation(adata_pseudobulk)
+        latent_pseudobulk = model.get_latent_representation(adata_pseudobulk, get_pseudobulk=False)
 
     if use_nnls:
         deconv = LinearRegression(positive=True).fit(adata_latent_signature.X.T,
