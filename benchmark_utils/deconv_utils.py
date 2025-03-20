@@ -132,6 +132,7 @@ def compute_correlations(deconv_results, ground_truth_fractions):
         for i in range(len(deconv_results))
     ]
     correlations = pd.DataFrame({"correlations": correlations})
+    correlations["sample_id"] = deconv_results.index
     return correlations
 
 
@@ -149,6 +150,7 @@ def compute_group_correlations(deconv_results, ground_truth_fractions):
         for i in range(len(deconv_results.T))
     ]
     correlations = pd.DataFrame({"correlations": correlations})
+    correlations["cell_types"] = deconv_results.columns
     return correlations
 
 

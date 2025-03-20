@@ -1,20 +1,24 @@
 """Pseudobulk benchmark."""
 
 import argparse
-import os
-import scanpy as sc
 import pandas as pd
-import anndata as ad
-import warnings
 from loguru import logger
-from sklearn.linear_model import LinearRegression
 from typing import Optional
 
 from benchmark_utils import add_cell_types_grouped, create_signature
-from run_benchmark_help import initialise_deconv_methods, load_preprocessed_datasets
-from run_benchmark_config_dataclass import (
-    RunBenchmarkConfig,
-    GRANULARITY_TO_DATASET,
+from run_benchmark_help import (
+    compute_benchmark_correlations,
+    initialize_deconv_methods,
+    launch_evaluation_pseudobulk_samplings,
+    load_preprocessed_datasets,
+    plot_benchmark_correlations,
+    save_deconvolution_results
+)
+from run_benchmark_config_dataclass import RunBenchmarkConfig
+from run_benchmark_constants import (
+    DECONV_METHOD_TO_EVALUATION_PSEUDOBULK,
+    GRANULARITY_TO_TRAINING_DATASET,
+    GRANULARITY_TO_EVALUATION_DATASET,
     SINGLE_CELL_DATASETS,
 ) 
 
@@ -23,6 +27,8 @@ def run_benchmark(
     evaluation_datasets: list,
     granularities: list,
     evaluation_pseudobulk_samplings: Optional[list],
+    n_samples_evaluation_pseudobulk: int,
+    n_cells_per_evaluation_pseudobulk: Optional[list],
     signature_matrices: Optional[list],
     train_dataset: Optional[str],
     n_variable_genes: Optional[int],
@@ -34,12 +40,14 @@ def run_benchmark(
     The arguments are defined in a config yaml file passed to the RunBenchmarkConfig
     dataclass.
     """
+    # Loading datasets
     all_data = load_preprocessed_datasets(
-        evaluation_datasets,
-        train_dataset,
-        n_variable_genes,
+        evaluation_datasets=evaluation_datasets,
+        train_dataset=train_dataset,
+        n_variable_genes=n_variable_genes,
     )
 
+    # Loading signature matrices
     if signature_matrices is not None:
         all_data["signature_matrices"] = {}
         for signature_matrix in signature_matrices:
@@ -48,13 +56,13 @@ def run_benchmark(
                 signature_matrix
             )
 
-    # Will there be a problem for differentiation of FACS vs SC ? 
+    # Loading train/test indexes and cell type groupings
     for granularity in granularities:
             logger.info(
                 f"Loading train/test index for granularity: {granularity}..."
             )
             for dataset in all_data["datasets"]:
-                    if GRANULARITY_TO_DATASET[granularity] == dataset:
+                    if GRANULARITY_TO_TRAINING_DATASET[granularity] == dataset:
                         all_data["datasets"][dataset]["dataset"], train_test_index = \
                             add_cell_types_grouped(
                                 all_data["datasets"][dataset]["dataset"], 
@@ -63,66 +71,79 @@ def run_benchmark(
                         all_data["datasets"][dataset][granularity] = train_test_index
 
 
-    logger.info(
-        "All the data are now loaded."
-    )
+    logger.info("All the data is now loaded.")
 
+    # Deconvolution training and inference
+    all_data["deconv_results"] = {}
     for granularity in granularities:
         logger.info(
             f"Launching the deconvolution experiments for granularity: {granularity}..."
         )
-        deconv_methods_initialized = initialise_deconv_methods(
+        all_data["deconv_results"][granularity] = {}
+        deconv_methods_initialized = initialize_deconv_methods(
             deconv_methods=deconv_methods,
             all_data=all_data,
             granularity=granularity,
             train_dataset=train_dataset,
             signature_matrices=signature_matrices,
         )
-        evaluation_dataset = GRANULARITY_TO_DATASET[granularity]
-        logger.info(f"Running evaluation on {evaluation_dataset}...")
+        evaluation_dataset = GRANULARITY_TO_EVALUATION_DATASET[granularity]
+        logger.debug(f"Running evaluation on {evaluation_dataset}...")
         if evaluation_dataset in SINGLE_CELL_DATASETS:
+            # Inference on scRNAseq-derived pseudobulks
             for evaluation_pseudobulk_sampling in evaluation_pseudobulk_samplings:
-                # TODO: TAKE from here, we also need the N_CELLS argument and to reformat the sanity checks to make them more readable (which was the whole point of this PR at first)
-                logger.info(
-                    f"Creating pseudobulks with {evaluation_pseudobulk_sampling} "
-                    "method..."
-                )
-                for deconv_method_initialized in deconv_methods_initialized:
-                    pass
+                all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling] = {}
+                for n_cells in n_cells_per_evaluation_pseudobulk:
+                    all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells] = {}
+                    evaluation_pseudobulks = launch_evaluation_pseudobulk_samplings(
+                        evaluation_pseudobulk_sampling=evaluation_pseudobulk_sampling,
+                        all_data=all_data,
+                        evaluation_dataset=evaluation_dataset,
+                        granularity=granularity,
+                        n_cells_per_evaluation_pseudobulk=n_cells,
+                        n_samples_evaluation_pseudobulk=n_samples_evaluation_pseudobulk,
+                    )
+                    for deconv_method_initialized_key, deconv_method_initialized in deconv_methods_initialized.items():
+                        if hasattr(deconv_method_initialized, "signature_matrix_name"):
+                            signature_matrix_name = deconv_method_initialized.signature_matrix_name
+                            deconv_method_key = deconv_method_initialized_key.split(f"_{signature_matrix_name}")[0]
+                        var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[deconv_method_key]
+                        deconv_results = deconv_method_initialized.apply_deconvolution(to_deconvolve=evaluation_pseudobulks[var_to_deconvolve])
+                        all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key] = {}
+                        all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key]["deconvolution_results"] = deconv_results
+                        all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key]["ground_truth"] = evaluation_pseudobulks["df_proportions_test"]
         else:
-            # direct pred
-            pass
+            # Direct inference on Bulk data
+            # TODO: should we allow inference on scRNAseq-derived pseudobulks, from bulk granularities ?
+            for deconv_method_initialized_key, deconv_method_initialized in deconv_methods_initialized.items():
+                deconv_results = deconv_method_initialized.apply_deconvolution(to_deconvolve=all_data["datasets"][evaluation_dataset]["dataset"])
+                all_data["deconv_results"][granularity][deconv_method_initialized_key] = {}
+                all_data["deconv_results"][granularity][deconv_method_initialized_key]["ground_truth"] = all_data["datasets"][evaluation_dataset]["ground_truth"]
+                all_data["deconv_results"][granularity][deconv_method_initialized_key]["deconvolution_results"] = deconv_results
 
+    logger.info("Deconvolution inference is now complete.")
 
+    if save:
+        save_deconvolution_results(all_data["deconv_results"], experiment_path=experiment_name)
+        logger.debug("Saved deconvolution results and ground truths.")
 
+    # Compute basic correlations
+    logger.info("Computing correlations.")
+    df_samples_correlation = compute_benchmark_correlations(all_data["deconv_results"], correlation_type="sample_wise_correlation")
+    df_cell_type_correlation = compute_benchmark_correlations(all_data["deconv_results"], correlation_type="cell_type_wise_correlation")
+    df_all_correlations = pd.concat([df_samples_correlation, df_cell_type_correlation], ignore_index=True)
+    if save:
+        df_all_correlations.to_csv(experiment_name + "/df_all_correlations.csv")
+        logger.debug(f"Saved correlation results in {experiment_name}/df_all_correlations.csv")
+    logger.info("Correlations computed.")
 
-    # for deconv_method_name in deconv_methods:
-    #         logger.info(f"Running deconvolution method: {deconv_method_name}")
-    #         if not os.path.exists(f"{experiment_path}/{deconv_method_name}"):
-    #             os.mkdir(f"{experiment_path}/{deconv_method_name}")
-    #         # Instantiate deconvolution method
-    #         method = deconv_methods[deconv_method_name]
-    #         if method in FIT_SINGLE_CELL:
-    #             # Fit deconvolution method
-    #             method.fit(adata_train[:,filtered_genes].copy())
-    #         if method in CREATE_LATENT_SIGNATURE:
-    #             # Create the signature matrix inside the latent space
-    #             method.create_latent_signature(adata_train[:,filtered_genes])
+    # Basic plotting
+    plot_benchmark_correlations(df_all_correlations, save_path=experiment_name)
+    logger.debug(f"Saved plots.")
 
-    #         for sanity_check_name in sanity_checks:
-    #             sanity_check_type = sanity_check_name.split("_")[3]
-    #             logger.info(f"Run following sanity check: {sanity_check_name}")
-    #             if not os.path.exists(f"{experiment_path}/{deconv_method_name}/{sanity_check_type}"):
-    #                 os.mkdir(f"{experiment_path}/{deconv_method_name}/{sanity_check_type}")
+    open(f"{experiment_name}/experiment_over.txt", "w").close() # Finish experiment
+    logger.info("Experiment over.")
 
-    #             # Create the pseudobulk (or bulk) test and true simulated (or facs) proportions
-    #             pseudobulk_test, df_proportions_test = sanity_check.create_test_data(adata_test.copy())
-
-    #             # Perform test deconvolution
-    #             deconv_results = method(pseudobulk_test, df_proportions_test)
-    #             saving_path = f"{experiment_path}/{deconv_method_name}/{sanity_check_type}/{sanity_check_name}.csv"
-    #             deconv_results.to_csv(saving_path)
-    #             logger.info(f"The deconvolution results are saved inside the following directory: {saving_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -134,4 +155,3 @@ if __name__ == "__main__":
     config_dict = RunBenchmarkConfig.from_config_yaml(config_path=args.config)
 
     run_benchmark(**config_dict)
-    # constants should be used for the methods HPs for now, but saved + logged as full configs

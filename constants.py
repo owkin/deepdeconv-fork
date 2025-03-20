@@ -6,36 +6,14 @@ TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_CELL_TYPE_GROUP = (
     "2nd_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
 )
+N_GENES = 4000 # number of input genes after preprocessing
 
-## Constants for run_pseudobulk_benchmark.py
-SIGNATURE_CHOICE = "FACS_1st_level_granularity" # ["laughney", "CTI_1st_level_granularity", "CTI_2nd_level_granularity", "CTI_3rd_level_granularity", "CTI_4th_level_granularity", "FACS_1st_level_granularity"]
-if SIGNATURE_CHOICE in ["laughney", "CTI_1st_level_granularity"]:
-    BENCHMARK_CELL_TYPE_GROUP = "1st_level_granularity"
-elif SIGNATURE_CHOICE == "CTI_2nd_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "2nd_level_granularity"
-elif SIGNATURE_CHOICE == "CTI_3rd_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "3rd_level_granularity"
-elif SIGNATURE_CHOICE == "CTI_4th_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "4th_level_granularity"
-elif SIGNATURE_CHOICE == "FACS_1st_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "FACS_1st_level_granularity"
-else:
-    BENCHMARK_CELL_TYPE_GROUP = None # no signature was created
-BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
-N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
-N_CELLS = [100] # list of number of cells to try for the lineplot
-GENERATIVE_MODELS = ["MixUpVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
-BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
-COMPUTE_SC_RESULTS_WHEN_FACS = True
-
-## General constants to change depending on the task
+## Constants for both run_mixupvi.py and run_benchmark.py
+# For all VI models
 SAVE_MODEL = False
 SEED = 3
 LATENT_SIZE = 25
-MAX_EPOCHS = 100
-
-## Other constants to tune and then fix
-N_GENES = 4000 # number of input genes after preprocessing
+MAX_EPOCHS = 3
 # MixUpVI training hyperparameters
 BATCH_SIZE = 1024
 TRAIN_SIZE = 0.7 # as opposed to validation
@@ -57,7 +35,7 @@ DISPERSION = "gene"  # ["gene", "gene_label"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
 USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 
-# different possibilities of cell groupings with the CTI dataset
+# Other : different possibilities of cell groupings with the CTI dataset
 GROUPS = {
     "1st_level_granularity": {
         "B": [
@@ -193,5 +171,3 @@ GROUPS = {
                      "Intermediate macrophages", "Intestinal macrophages","Mast cells"]
     }
 }
-
-# %%

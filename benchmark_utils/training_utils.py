@@ -148,7 +148,7 @@ def fit_destvi(adata: ad.AnnData,
               adata_pseudobulk: ad.AnnData,
               model_path_1: str,
               model_path_2: str,
-              cell_type_key: str = "cell_types_grouped",
+              cell_type_group: str = "cell_types_grouped",
               save_model: bool = True,
               ) -> Tuple[scvi.model.CondSCVI, scvi.model.DestVI]:
   """Fit CondSCVI and DestVI model to paired single-cell/pseudoulk datasets."""
@@ -160,7 +160,7 @@ def fit_destvi(adata: ad.AnnData,
         scvi.model.CondSCVI.setup_anndata(
             adata,
             layer="counts",
-            labels_key=cell_type_key
+            labels_key=cell_type_group
         )
         condscvi_model = scvi.model.CondSCVI(adata, weight_obs=False)
         condscvi_model.view_anndata_setup()

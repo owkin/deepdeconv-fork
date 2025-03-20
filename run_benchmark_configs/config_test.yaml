@@ -1,11 +1,13 @@
 ## A test config to run the benchmark
 
-deconv_methods: ["NNLS", "MixUpVI"]
+deconv_methods: ["NNLS", "MixUpVI"] # "TAPE", "Scaden", "scVI", "DestVI"
 evaluation_datasets: ["CTI", "BULK_FACS"]
 granularities: ["2nd_level_granularity", "FACS_1st_level_granularity"]
-evaluation_pseudobulk_samplings: ["DIRICHLET"]
+evaluation_pseudobulk_samplings: ["DIRICHLET"] # "UNIFORM", "PURIFIED"
+n_samples_evaluation_pseudobulk: 500
+n_cells_per_evaluation_pseudobulk: [100, 500]
 signature_matrices: ["CTI_2nd_level_granularity", "FACS_1st_level_granularity"]
 train_dataset: "CTI"
 n_variable_genes: 3000
-save: False
-experiment_name: "test_benchmark"
+experiment_name: "test_benchmark" # if None, a random name will be chosen
+save: True # if False, only the plots will be saved

@@ -35,7 +35,7 @@ def preprocess_scrna(
         flavor="seurat_v3",
         batch_key=batch_key,
         subset=False,
-        inplace=True
+        inplace=True,
     )
     #TODO: add the filtering / QC steps that they perform in Servier
     # concat the result df to adata.var
@@ -190,8 +190,18 @@ def create_purified_pseudobulk_dataset(
                                                     )
     adata_pseudobulk_rc.obs_names = group
     adata_pseudobulk_counts.obs_names = group
+    groundtruth_fractions = pd.DataFrame(
+        np.eye(len(group)), index=group, columns=group
+    )
+    groundtruth_fractions.columns.name = cell_type_group
 
-    return adata_pseudobulk_counts, adata_pseudobulk_rc
+    pseudobulks = {
+        "adata_pseudobulk_test_counts": adata_pseudobulk_counts,
+        "adata_pseudobulk_test_rc": adata_pseudobulk_rc,
+        "df_proportions_test": groundtruth_fractions,
+    }
+
+    return pseudobulks
 
 
 def create_uniform_pseudobulk_dataset(
@@ -242,7 +252,12 @@ def create_uniform_pseudobulk_dataset(
         0
     )  # the Nan are cells not sampled
 
-    return adata_pseudobulk_counts, adata_pseudobulk_rc, groundtruth_fractions
+    pseudobulks = {
+        "adata_pseudobulk_test_counts": adata_pseudobulk_counts,
+        "adata_pseudobulk_test_rc": adata_pseudobulk_rc,
+        "df_proportions_test": groundtruth_fractions,
+    }     
+    return pseudobulks
 
 
 def create_dirichlet_pseudobulk_dataset(
@@ -262,7 +277,7 @@ def create_dirichlet_pseudobulk_dataset(
     conjugate to the multinomial distribution, thus giving an easy posterior
     calculation.
     """
-    logger.info("Creating dirichlet pseudobulk dataset...")
+    # logger.info("Creating dirichlet pseudobulk dataset...")
     seed = random.randint(0, 1000)
     random_state = np.random.RandomState(seed=seed)
     cell_types = adata.obs[cell_type_group].value_counts()
@@ -333,4 +348,11 @@ def create_dirichlet_pseudobulk_dataset(
     groundtruth_fractions = groundtruth_fractions.fillna(
         0
     )  # The Nan are cells not sampled
-    return all_adata_samples, adata_pseudobulk_counts, adata_pseudobulk_rc, groundtruth_fractions
+
+    pseudobulks = {
+        "all_adata_samples_test": all_adata_samples,
+        "adata_pseudobulk_test_counts": adata_pseudobulk_counts,
+        "adata_pseudobulk_test_rc": adata_pseudobulk_rc,
+        "df_proportions_test": groundtruth_fractions,
+    }     
+    return pseudobulks
