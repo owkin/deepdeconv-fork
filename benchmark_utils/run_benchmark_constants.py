@@ -1,58 +1,90 @@
 """All the constants used by run_benchmark.py to configure the pipeline."""
 
-DECONV_METHODS = {
-    "scVI": {
-        "_target_": "run_benchmark_help.scVIMethod",
-        "adata_train": None,
-        "model_path": "",
-        "cell_type_group": "cell_types_grouped",
-        "save_model": False,
+import importlib
+
+def initialize_func(func_config: dict):
+    """Initialize a function from a dict config.
+
+    Parameters
+    ----------
+    func_config: dict
+        The function dict config to initialize
+    """
+    target_path = func_config["_target_"]
+    module_name, func_name = target_path.rsplit(".", 1)
+    module = importlib.import_module(module_name)
+    initialized_func = getattr(module, func_name)
+    kwargs = {k: v for k, v in func_config.items() if k != "_target_"}
+    return initialized_func, kwargs
+
+
+############### Dict configs of functions to initialize. ###############
+
+
+CORRELATION_FUNCTIONS = {
+    "sample_wise_correlation": {
+        "_target_": "benchmark_utils.compute_correlations",
+        "deconv_results": None, 
+        "ground_truth_fractions": None,
     },
-    "DestVI": {
+    "cell_type_wise_correlation": {
+        "_target_": "benchmark_utils.compute_group_correlations",
+        "deconv_results": None, 
+        "ground_truth_fractions": None,
+    }, 
+}
+
+DATASETS = {
+    "TOY": {
         "_target_": "",
-        "adata": None,
-        "prior_alphas": None,
-        "n_sample": None,
-        "model_path1": "",
-        "model_path2": "",
-        "cell_type_group": "",
-        "save_model": False,
     },
+    "CTI": {
+        "_target_": "benchmark_utils.load_cti",
+        "n_variable_genes": None,
+    },
+    "BULK_FACS": {
+        "_target_": "benchmark_utils.load_bulk_facs",
+    },
+}
+
+DECONV_METHODS = {
     "MixUpVI": {
-        "_target_": "run_benchmark_help.MixUpVIMethod",
+        "_target_": "benchmark_utils.MixUpVIMethod",
         "adata_train": None,
         "model_path": "",
         "cell_type_group": "cell_types_grouped",
         "save_model": False,
     },
     "NNLS": {
-        "_target_": "run_benchmark_help.NNLSMethod",
+        "_target_": "benchmark_utils.NNLSMethod",
         "signature_matrix_name": "",
         "signature_matrix": None,
     },
+    "scVI": {
+        "_target_": "benchmark_utils.scVIMethod",
+        "adata_train": None,
+        "model_path": "",
+        "save_model": False,
+    },
+    "DestVI": {
+        "_target_": "benchmark_utils.DestVIMethod",
+        "adata_train": None,
+        "adata_pseudobulk": None,
+        "model_path1": "",
+        "model_path2": "",
+        "cell_type_group": "cell_types_grouped",
+        "save_model": False,
+    },
     "TAPE": {
-        "_target_": "",
+        "_target_": "benchmark_utils.TAPEMethod",
         "signature_matrix_name": "",
         "signature_matrix": None,
     },
     "Scaden": {
-        "_target_": "",
+        "_target_": "benchmark_utils.ScadenMethod",
         "signature_matrix_name": "",
         "signature_matrix": None,
     }
-}
-
-DATASETS = { # something that takes preprocessing into account !! (not train/test split yet though)
-    "TOY": {
-        "_target_": "",
-    },
-    "CTI": {
-        "_target_": "run_benchmark_help.load_cti",
-        "n_variable_genes": None,
-    },
-    "BULK_FACS": {
-        "_target_": "run_benchmark_help.load_bulk_facs",
-    },
 }
 
 EVALUATION_PSEUDOBULK_SAMPLINGS = {
@@ -82,18 +114,9 @@ EVALUATION_PSEUDOBULK_SAMPLINGS = {
     }
 }
 
-CORRELATION_FUNCTIONS = {
-    "sample_wise_correlation": {
-        "_target_": "benchmark_utils.compute_correlations",
-        "deconv_results": None, 
-        "ground_truth_fractions": None,
-    },
-    "cell_type_wise_correlation": {
-        "_target_": "benchmark_utils.compute_group_correlations",
-        "deconv_results": None, 
-        "ground_truth_fractions": None,
-    }, 
-}
+
+############### General constants. ###############
+
 
 N_CELLS_EVALUATION_PSEUDOBULK_SAMPLINGS = {"UNIFORM", "DIRICHLET"}
 TRAIN_DATASETS = {"CTI"}

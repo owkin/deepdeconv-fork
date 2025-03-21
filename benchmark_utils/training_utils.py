@@ -151,38 +151,38 @@ def fit_destvi(adata: ad.AnnData,
               cell_type_group: str = "cell_types_grouped",
               save_model: bool = True,
               ) -> Tuple[scvi.model.CondSCVI, scvi.model.DestVI]:
-  """Fit CondSCVI and DestVI model to paired single-cell/pseudoulk datasets."""
-  # condscVI
-  if os.path.exists(model_path_1):
-        logger.info(f"Model fitted, saved in path:{model_path_1}, loading condscVI...")
-        condscvi_model = scvi.model.CondSCVI.load(model_path_1, adata)
-  else:
-        scvi.model.CondSCVI.setup_anndata(
-            adata,
-            layer="counts",
-            labels_key=cell_type_group
-        )
-        condscvi_model = scvi.model.CondSCVI(adata, weight_obs=False)
-        condscvi_model.view_anndata_setup()
-        condscvi_model.train(max_epochs=MAX_EPOCHS, train_size=TRAIN_SIZE)
-        if save_model:
-            condscvi_model.save(model_path_1)
-  # DestVI
-  if os.path.exists(model_path_2):
-        logger.info(f"Model fitted, saved in path:{model_path_2}, loading DestVI...")
-        destvi_model = scvi.model.DestVI.load(model_path_2, adata_pseudobulk)
-  else:
-        scvi.model.DestVI.setup_anndata(
-            adata_pseudobulk,
-            layer="counts"
+    """Fit CondSCVI and DestVI model to paired single-cell/pseudoulk datasets."""
+    # condscVI
+    if os.path.exists(model_path_1):
+            logger.info(f"Model fitted, saved in path:{model_path_1}, loading condscVI...")
+            condscvi_model = scvi.model.CondSCVI.load(model_path_1, adata)
+    else:
+            scvi.model.CondSCVI.setup_anndata(
+                adata,
+                layer="counts",
+                labels_key=cell_type_group
             )
-        destvi_model = scvi.model.DestVI.from_rna_model(adata_pseudobulk, condscvi_model)
-        destvi_model.view_anndata_setup()
-        destvi_model.train(max_epochs=2500)
-        if save_model:
-            destvi_model.save(model_path_2)
+            condscvi_model = scvi.model.CondSCVI(adata, weight_obs=False)
+            condscvi_model.view_anndata_setup()
+            condscvi_model.train(max_epochs=MAX_EPOCHS, train_size=TRAIN_SIZE)
+            if save_model:
+                condscvi_model.save(model_path_1)
+    # DestVI
+    if os.path.exists(model_path_2):
+            logger.info(f"Model fitted, saved in path:{model_path_2}, loading DestVI...")
+            destvi_model = scvi.model.DestVI.load(model_path_2, adata_pseudobulk)
+    else:
+            scvi.model.DestVI.setup_anndata(
+                adata_pseudobulk,
+                layer="counts"
+                )
+            destvi_model = scvi.model.DestVI.from_rna_model(adata_pseudobulk, condscvi_model)
+            destvi_model.view_anndata_setup()
+            destvi_model.train(max_epochs=2500)
+            if save_model:
+                destvi_model.save(model_path_2)
 
-  return condscvi_model, destvi_model
+    return condscvi_model, destvi_model
 
 
 

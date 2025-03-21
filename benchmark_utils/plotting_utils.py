@@ -8,6 +8,36 @@ from typing import Dict
 from datetime import datetime
 from loguru import logger
 
+
+def plot_benchmark_correlations(df_all_correlations, save_path: str, save: bool = True):
+    """General function to plot benchmark correlations, and save them by default."""
+    def _get_groups(df, groupby_col):
+        """Returns grouped DataFrames if groupby_col exists and is not empty, else returns a list with the original df."""
+        if groupby_col in df.columns and df[groupby_col].notna().any():
+            return [group for _, group in df.groupby(groupby_col)]
+        return [df]
+    
+    plot_func_map = {
+        "sample_wise_correlation": plot_deconv_results,
+        "cell_type_wise_correlation": plot_deconv_results_group
+    }
+
+    for granularity in df_all_correlations.granularity.unique():
+        df_all_correlations_temp = df_all_correlations[df_all_correlations["granularity"] == granularity]
+        if "num_cells" in df_all_correlations_temp.columns and df_all_correlations_temp.num_cells.dropna().nunique() > 1:
+            # Multiple num_cells were computed
+            df_to_plot = df_all_correlations_temp[df_all_correlations_temp["correlation_type"] == "sample_wise_correlation"]
+            for group in _get_groups(df_to_plot, "sampling_method"):
+                plot_deconv_lineplot(group, save=save, save_path=save_path)
+        else:
+            # One pseudobulk num_cells or bulk
+            for correlation_type in df_all_correlations_temp["correlation_type"].unique():
+                df_to_plot = df_all_correlations_temp[df_all_correlations_temp["correlation_type"] == correlation_type]
+                plot_func = plot_func_map.get(correlation_type, plot_deconv_results)  # Default to `plot_deconv_results`
+                for group in _get_groups(df_to_plot, "sampling_method"):
+                    plot_func(group, save=save, save_path=save_path)
+
+
 def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
     if not more_details:

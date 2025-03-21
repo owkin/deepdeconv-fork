@@ -1,26 +1,25 @@
-"""Pseudobulk benchmark."""
+"""Run pseudobulk benchmark."""
 
 import argparse
 import pandas as pd
 from loguru import logger
 from typing import Optional
 
-from benchmark_utils import add_cell_types_grouped, create_signature
-from run_benchmark_help import (
+from benchmark_utils import (
+    add_cell_types_grouped,
     compute_benchmark_correlations,
+    create_signature,
     initialize_deconv_methods,
     launch_evaluation_pseudobulk_samplings,
     load_preprocessed_datasets,
     plot_benchmark_correlations,
-    save_deconvolution_results
-)
-from run_benchmark_config_dataclass import RunBenchmarkConfig
-from run_benchmark_constants import (
+    save_deconvolution_results,
     DECONV_METHOD_TO_EVALUATION_PSEUDOBULK,
     GRANULARITY_TO_TRAINING_DATASET,
     GRANULARITY_TO_EVALUATION_DATASET,
     SINGLE_CELL_DATASETS,
-) 
+)
+from run_benchmark_config_dataclass import RunBenchmarkConfig
 
 def run_benchmark(
     deconv_methods: list,
@@ -107,7 +106,9 @@ def run_benchmark(
                         if hasattr(deconv_method_initialized, "signature_matrix_name"):
                             signature_matrix_name = deconv_method_initialized.signature_matrix_name
                             deconv_method_key = deconv_method_initialized_key.split(f"_{signature_matrix_name}")[0]
-                        var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[deconv_method_key]
+                            var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[deconv_method_key]
+                        else:
+                            var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[deconv_method_initialized_key]
                         deconv_results = deconv_method_initialized.apply_deconvolution(to_deconvolve=evaluation_pseudobulks[var_to_deconvolve])
                         all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key] = {}
                         all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key]["deconvolution_results"] = deconv_results

@@ -232,8 +232,10 @@ class MixUpDataSplitter(DataSplitter):
         self.test_idx = indices[(n_val + n_train) :]
 
         cell_type_key = None
-        if (labels_key := self.adata_manager.registry["setup_args"]["labels_key"]) == \
-            "cell_type" or labels_key == "cell_types_grouped":
+        if ("labels_key" in self.adata_manager.registry["setup_args"].keys()) and (
+            (labels_key := self.adata_manager.registry["setup_args"]["labels_key"]) == \
+            "cell_type" or labels_key == "cell_types_grouped"
+        ):
             cell_type_key = labels_key
 
         if cell_type_key is not None:

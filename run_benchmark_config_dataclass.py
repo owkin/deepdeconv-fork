@@ -12,7 +12,7 @@ import yaml
 from zoneinfo import ZoneInfo
 
 import constants
-from run_benchmark_constants import (
+from benchmark_utils import (
     DATASETS,
     DECONV_METHODS,
     EVALUATION_PSEUDOBULK_SAMPLINGS,
@@ -341,14 +341,14 @@ class RunBenchmarkConfig:
             if config_dict["train_dataset"] is not None:
                 logger.warning(
                     "A train dataset was provided even though none of the provided "
-                    f"deconvolution methods ({config_dict['deconvolution_methods']}) "
+                    f"deconvolution methods ({config_dict['deconv_methods']}) "
                     "require fitting. Thus, train_dataset will not be used."
                 )
                 config_dict["train_dataset"] = None
             if config_dict["n_variable_genes"] is not None:
                 logger.warning(
                     "n_variable_genes was provided even though none of the provided "
-                    f"deconvolution methods ({config_dict['deconvolution_methods']}) "
+                    f"deconvolution methods ({config_dict['deconv_methods']}) "
                     "require to be filtered to their most variable genes. Thus, this "
                     "argument will not be used."
                 )
@@ -418,20 +418,21 @@ class RunBenchmarkConfig:
                 json.dump(config_dict, json_file)
             logger.debug(f"Saved config dict to {config_path}")
             # Save training config
-            if "MixUpVI" in config_dict["deconv_methods"]:
-                training_constants_to_save = TRAINING_CONSTANTS_TO_SAVE
-            elif "scVI" in config_dict["deconv_methods"] or "DestVI" in config_dict[
-                "deconv_methods"
-            ]:
-                training_constants_to_save = ["LATENT_SIZE", "MAX_EPOCHS"]
-            training_config = {
-                key: getattr(constants, key)
-                for key in training_constants_to_save if hasattr(constants, key)
-            }
-            config_path = full_path + "/training_config.json"
-            with open(config_path, "w", encoding="utf-8") as json_file:
-                json.dump(training_config, json_file)
-            logger.debug(f"Saved config dict to {config_path}")
+            if len(set(config_dict["deconv_methods"]).intersection(MODEL_TO_FIT))>0:
+                if "MixUpVI" in config_dict["deconv_methods"]:
+                    training_constants_to_save = TRAINING_CONSTANTS_TO_SAVE
+                elif "scVI" in config_dict["deconv_methods"] or "DestVI" in config_dict[
+                    "deconv_methods"
+                ]:
+                    training_constants_to_save = ["LATENT_SIZE", "MAX_EPOCHS"]
+                training_config = {
+                    key: getattr(constants, key)
+                    for key in training_constants_to_save if hasattr(constants, key)
+                }
+                config_path = full_path + "/training_config.json"
+                with open(config_path, "w", encoding="utf-8") as json_file:
+                    json.dump(training_config, json_file)
+                logger.debug(f"Saved config dict to {config_path}")
 
         return config_dict
 

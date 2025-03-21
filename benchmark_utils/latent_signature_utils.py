@@ -7,8 +7,8 @@ import pandas as pd
 import random
 import torch
 
-from .dataset_utils import create_anndata_pseudobulk
 from constants import SIGNATURE_TYPE
+from .pseudobulk_dataset_utils import create_anndata_pseudobulk
 
 
 def create_latent_signature(
@@ -125,7 +125,7 @@ def create_latent_signature(
                             adata_sampled.obs, adata_sampled.var_names, pseudobulk
                         )
                     result = model.get_latent_representation(
-                        adata_sampled, get_pseudobulk = False
+                        adata_sampled, # get_pseudobulk = False
                     )
                     if SIGNATURE_TYPE == "pre_encoded":
                         result = result.reshape(-1)
