@@ -59,7 +59,7 @@ elif BENCHMARK_DATASET == "CTI":
 elif BENCHMARK_DATASET == "CTI_RAW":
     warnings.warn("The raw data of this adata is on adata.raw.X, but the normalised "
                   "adata.X will be used here")
-    adata = sc.read("/home/owkin/data/cross-tissue/omics/raw/local.h5ad")
+    adata = sc.read("/home/owkin/data/dataset-efa9b1cb-3fbb-4dff-af47-249e8b81a2ef/omics/raw/local.h5ad")
     adata = preprocess_scrna(adata,
                      keep_genes=N_GENES,
                      batch_key="donor_id",
@@ -163,17 +163,16 @@ for n in N_CELLS:
 if len(results) > 1:
     plot_deconv_lineplot(results,
                         save=True,
-                        filename=f"lineplot_tuned_mixupvi_third_granularity_retry_normal")
+                        filename=f"lineplot_tuned_mixupvi_{SIGNATURE_CHOICE}")
 else:
     key = list(results.keys())[0]
     plot_deconv_results(results[key],
                         save=True,
-                        # filename=f"benchmark_{key}_cells_first_granularity")
-                        filename="test_first_type")
+                        filename=f"benchmark_{key}_{SIGNATURE_CHOICE}")
     plot_deconv_results_group(results_group[key],
                                 save=True,
-                                # filename=f"benchmark_{key}_cells_first_granularity_cell_type")
-                                filename="test_first_type_cell_type")
+                                filename=f"benchmark_{key}_{SIGNATURE_CHOICE}_group")
+
 
 
 # %% (Optional) Sanity check 1.

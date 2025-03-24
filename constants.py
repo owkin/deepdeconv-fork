@@ -2,13 +2,13 @@
 
 ## Constants for run_mixupvi.py
 TUNE_MIXUPVI = True
-TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+TRAINING_DATASET = "CTI_RAW"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_CELL_TYPE_GROUP = (
-    "2nd_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
+    "1st_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
 )
 
 ## Constants for run_pseudobulk_benchmark.py
-SIGNATURE_CHOICE = "CTI_1st_level_granularity" # ["laughney", "CTI_1st_level_granularity", "CTI_2nd_level_granularity", "CTI_3rd_level_granularity", "CTI_4th_level_granularity", "FACS_1st_level_granularity"]
+SIGNATURE_CHOICE = "CTI_3rd_level_granularity" # ["laughney", "CTI_1st_level_granularity", "CTI_2nd_level_granularity", "CTI_3rd_level_granularity", "CTI_4th_level_granularity", "FACS_1st_level_granularity"]
 if SIGNATURE_CHOICE in ["laughney", "CTI_1st_level_granularity"]:
     BENCHMARK_CELL_TYPE_GROUP = "1st_level_granularity"
 elif SIGNATURE_CHOICE == "CTI_2nd_level_granularity":
@@ -24,7 +24,7 @@ else:
 BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_RAW"]
 BATCH_KEY = "donor_id"
 N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
-N_CELLS = [2000] # list of number of cells to try for the lineplot
+N_CELLS = [500] # list of number of cells to try for the lineplot
 GENERATIVE_MODELS = ["MixupVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
 BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
 COMPUTE_SC_RESULTS_WHEN_FACS = True
@@ -36,7 +36,7 @@ LATENT_SIZE = 10
 MAX_EPOCHS = 100
 
 ## Other constants to tune and then fix
-N_GENES = 2000 # number of input genes after preprocessing
+N_GENES = 2200 # number of input genes after preprocessing
 # MixUpVI training hyperparameters
 BATCH_SIZE = 2048
 TRAIN_SIZE = 0.7 # as opposed to validation

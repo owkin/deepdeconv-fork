@@ -8,6 +8,8 @@ from typing import Dict
 from datetime import datetime
 from loguru import logger
 
+PLOT_PATH = "/home/owkin/project/plots/preprint/"
+
 def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
     if not more_details:
@@ -27,7 +29,7 @@ def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_det
     )
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+        plt.savefig((f"{PLOT_PATH}{filename}.png"), dpi=300)
 
 
 def plot_deconv_results(correlations, save=False, filename="test"):
@@ -52,7 +54,7 @@ def plot_deconv_results(correlations, save=False, filename="test"):
             )
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+        plt.savefig((f"{PLOT_PATH}{filename}.png"), dpi=300)
 
 def plot_deconv_results_group(correlations_group, save=False, filename="test_group"):
     """Plot the deconv correlation results from sanity checks 2 and 3.
@@ -84,7 +86,7 @@ def plot_deconv_results_group(correlations_group, save=False, filename="test_gro
     plt.title('Bar Plot of Correlations by Cell Type and Model')
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+        plt.savefig((f"{PLOT_PATH}{filename}.png"), dpi=300)
 
 def plot_deconv_lineplot(results: Dict[int, pd.DataFrame],
                          save=False,
@@ -152,13 +154,13 @@ def plot_mse_mae_deconv(model_history, train: bool = True, n_epochs: int = 100):
         suffix = "validation"
     plt.clf()
     plt.plot(
-        range(n_epochs), 
-        model_history[f"mse_deconv_{suffix}"], 
+        range(n_epochs),
+        model_history[f"mse_deconv_{suffix}"],
         label="Deconv MSE error",
     )
     plt.plot(
-        range(n_epochs), 
-        model_history[f"mae_deconv_{suffix}"], 
+        range(n_epochs),
+        model_history[f"mae_deconv_{suffix}"],
         label="Deconv MAE error",
     )
     plt.legend()
@@ -248,7 +250,7 @@ def compare_tuning_results(
     if hp_index_to_plot is not None:
         hp_to_plot = all_hp[hp_index_to_plot]
         all_results = all_results.loc[all_results[variable_tuned].isin(hp_to_plot)]
-    
+
     custom_palette = sns.color_palette("husl", n_colors=len(all_results[variable_tuned].unique()))
     all_results["epoch"] = all_results.index
     if (n_nan := all_results[variable_to_plot].isna().sum()) > 0:
