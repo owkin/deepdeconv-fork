@@ -9,7 +9,7 @@ from datetime import datetime
 from loguru import logger
 
 
-def plot_benchmark_correlations(df_all_correlations, save_path: str, save: bool = True):
+def plot_benchmark_correlations(df_all_correlations, save_path: str = "", save: bool = True):
     """General function to plot benchmark correlations, and save them by default."""
     def _get_groups(df, groupby_col):
         """Returns grouped DataFrames if groupby_col exists and is not empty, else returns a list with the original df."""
@@ -33,7 +33,7 @@ def plot_benchmark_correlations(df_all_correlations, save_path: str, save: bool 
             # One pseudobulk num_cells or bulk
             for correlation_type in df_all_correlations_temp["correlation_type"].unique():
                 df_to_plot = df_all_correlations_temp[df_all_correlations_temp["correlation_type"] == correlation_type]
-                plot_func = plot_func_map.get(correlation_type, plot_deconv_results)  # Default to `plot_deconv_results`
+                plot_func = plot_func_map.get(correlation_type, plot_deconv_results)
                 for group in _get_groups(df_to_plot, "sampling_method"):
                     plot_func(group, save=save, save_path=save_path)
 
@@ -73,23 +73,32 @@ def plot_deconv_results(correlations, save=False, save_path="", filename=""):
     correlations = correlations[["correlations","deconv_method"]]
     plt.clf()
     sns.set_style("whitegrid")
-    boxplot = sns.boxplot(correlations, x="deconv_method")
-    medians = correlations.groupby("deconv_method").median(numeric_only=True).round(4)
-    vertical_offset = (
-        medians * 0.0005
-    )  # for non-overlapping display
+    # Boxplot
+    boxplot = sns.boxplot(correlations, x="deconv_method", y="correlations", hue="deconv_method")
+    plt.xticks(rotation=90)
+    # Plot the medians
+    x_categories = [t.get_text() for t in boxplot.get_xticklabels()] # order of categories
+    medians = (
+        correlations.groupby("deconv_method")["correlations"]
+        .median()
+        .reindex(x_categories)  # ensure same order as x-axis
+        .round(4)
+    )
+    y_range = correlations["correlations"].max() - correlations["correlations"].min()
+    vertical_offset = y_range * 0.0005
     y_position = medians + vertical_offset
-    for xtick in range(len(medians)):  # show the median value
-        if np.isfinite(y_position.iloc[xtick,0]):
+    for xtick, method in enumerate(x_categories):
+        median_value = medians.loc[method]
+        if np.isfinite(median_value):
             boxplot.text(
                 xtick,
-                y_position.iloc[xtick,0],
-                medians.iloc[xtick,0],
+                y_position.loc[method],
+                f"{median_value:.4f}",
                 size="x-small",
-                color="w",
+                color="black",
+                ha="center",
                 weight="semibold",
             )
-    plt.show()
     if save:
         plt.savefig(f"{save_path}/{filename}.png", dpi=300)
 
