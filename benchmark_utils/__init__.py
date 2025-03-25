@@ -1,23 +1,30 @@
 """Imports"""
-from .deconv_utils import (
-    perform_nnls,
-    perform_latent_deconv,
+from .correlation_utils import (
+    compute_benchmark_correlations,
     compute_correlations,
     compute_group_correlations,
-    create_random_proportion,
 )
-from .dataset_utils import (
-    preprocess_scrna,
-    split_dataset,
-    create_new_granularity_index,
-    add_cell_types_grouped,
-    create_purified_pseudobulk_dataset,
-    create_uniform_pseudobulk_dataset,
-    create_dirichlet_pseudobulk_dataset,
+from .deconv_methods import (
+    NNLSMethod,
+    MixUpVIMethod,
+    scVIMethod,
+    DestVIMethod,
+    TAPEMethod,
+    ScadenMethod,
+)
+from .deconv_utils import (
+    initialize_deconv_methods,
+    save_deconvolution_results,
+    use_nnls_method,
 )
 from .latent_signature_utils import create_latent_signature
-from .training_utils import fit_scvi, fit_destvi, fit_mixupvi, tune_mixupvi
+from .load_dataset_utils import (
+    load_preprocessed_datasets,
+    load_cti,
+    load_bulk_facs,
+)
 from .plotting_utils import (
+    plot_benchmark_correlations,
     plot_purified_deconv_results,
     plot_deconv_results,
     plot_deconv_results_group,
@@ -31,15 +38,40 @@ from .plotting_utils import (
     plot_pearson_random,
     compare_tuning_results,
 )
+from .process_dataset_utils import (
+    preprocess_scrna,
+    add_cell_types_grouped,
+)
+from .pseudobulk_dataset_utils import (
+    create_anndata_pseudobulk,
+    create_purified_pseudobulk_dataset,
+    create_uniform_pseudobulk_dataset,
+    create_dirichlet_pseudobulk_dataset,
+    launch_evaluation_pseudobulk_samplings,
+)
+from .run_benchmark_constants import (
+    initialize_func,
+    CORRELATION_FUNCTIONS,
+    DATASETS,
+    DECONV_METHODS,
+    EVALUATION_PSEUDOBULK_SAMPLINGS,
+    N_CELLS_EVALUATION_PSEUDOBULK_SAMPLINGS,
+    TRAIN_DATASETS,
+    SINGLE_CELL_DATASETS,
+    MODEL_TO_FIT,
+    SIGNATURE_MATRIX_MODELS,
+    SINGLE_CELL_GRANULARITIES,
+    GRANULARITIES,
+    SIGNATURE_TO_GRANULARITY,
+    GRANULARITY_TO_TRAINING_DATASET,
+    GRANULARITY_TO_EVALUATION_DATASET,
+    DECONV_METHOD_TO_EVALUATION_PSEUDOBULK,
+    TRAINING_CONSTANTS_TO_SAVE,
+)
 from .signature_utils import (
     create_signature,
-    read_txt_r_signature,
-    map_hgnc_to_ensg,
 )
-from .sanity_checks_utils import (
-    run_purified_sanity_check,
-    run_sanity_check,
-)
+from .training_utils import fit_scvi, fit_destvi, fit_mixupvi, tune_mixupvi
 from .tuning_utils import(
     read_tuning_results,
     read_search_space,

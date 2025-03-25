@@ -1,48 +1,29 @@
 """Constants and global variables to run the different deconv files."""
 
-## constants for run_mixupvi.py
+## Constants for run_mixupvi.py
 TUNE_MIXUPVI = True
-TRAINING_DATASET = "CTI_PROCESSED"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
 TRAINING_CELL_TYPE_GROUP = (
     "2nd_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
 )
+N_GENES = 4000 # number of input genes after preprocessing (NOT USED INSIDE BENCHMARK)
 
-## constants for run_pseudobulk_benchmark.py
-SIGNATURE_CHOICE = "CTI_2nd_level_granularity" # ["laughney", "CTI_1st_level_granularity", "CTI_2nd_level_granularity", "CTI_3rd_level_granularity", "CTI_4th_level_granularity", "FACS_1st_level_granularity"]
-if SIGNATURE_CHOICE in ["laughney", "CTI_1st_level_granularity"]:
-    BENCHMARK_CELL_TYPE_GROUP = "1st_level_granularity"
-elif SIGNATURE_CHOICE == "CTI_2nd_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "2nd_level_granularity"
-elif SIGNATURE_CHOICE == "CTI_3rd_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "3rd_level_granularity"
-elif SIGNATURE_CHOICE == "CTI_4th_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "4th_level_granularity"
-elif SIGNATURE_CHOICE == "FACS_1st_level_granularity":
-    BENCHMARK_CELL_TYPE_GROUP = "FACS_1st_level_granularity"
-else:
-    BENCHMARK_CELL_TYPE_GROUP = None # no signature was created
-BENCHMARK_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
-N_SAMPLES = 500 # number of pseudbulk samples to create and assess for deconvolution
-GENERATIVE_MODELS = ["MixupVI"] #, "DestVI"] # "scVI", "CondscVI", "DestVI"
-# GENERATIVE_MODELS = [] # if only want baselines
-BASELINES = ["nnls"] # "nnls", "TAPE", "Scaden"
-# BASELINES = ["nnls"] # if only want nnls
-
-## general mixupvi constants when training it or preprocessing data
-SAVE_MODEL = False
-SEED = 0
-N_GENES = 3000 # number of input genes after preprocessing
-# MixUpVI training hyperparameters
+## Constants for both run_mixupvi.py and run_benchmark.py
+# For all VI models
+LATENT_SIZE = 30
 MAX_EPOCHS = 100
-BATCH_SIZE = 2048
+SAVE_MODEL = False
+SEED = 3
+# MixUpVI training hyperparameters
+BATCH_SIZE = 1024
 TRAIN_SIZE = 0.7 # as opposed to validation
 CHECK_VAL_EVERY_N_EPOCH = None
 if TRAIN_SIZE < 1:
     CHECK_VAL_EVERY_N_EPOCH = 1
 # MixUpVI model hyperparameters
-N_PSEUDOBULKS = 1
-N_CELLS_PER_PSEUDOBULK = None # None (then will be batch size) or int (will cap at batch size)
-LATENT_SIZE = 30
+N_PSEUDOBULKS = 100
+N_CELLS_PER_PSEUDOBULK = 256 # None (then will be batch size) or int (will cap at batch size)
+N_HIDDEN = 512
 CONT_COV = None  # None or list of continuous covariates to include
 CAT_COV = None # None or ["donor_id", "assay"]
 ENCODE_COVARIATES = False # whether to encode cont/cat covars (they are always decoded)
@@ -52,11 +33,9 @@ SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 MIXUP_PENALTY = "l2"  # ["l2", "kl"]
 DISPERSION = "gene"  # ["gene", "gene_label"]
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
-MIXUP_PENATLY_AGGREGATION = "mean" # ["mean", "sum", "max"]
-AVERAGE_VARIABLES_MIXUP_PENALTY = False 
 USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 
-# different possibilities of cell groupings with the CTI dataset
+# Other : different possibilities of cell groupings with the CTI dataset
 GROUPS = {
     "1st_level_granularity": {
         "B": [
@@ -190,6 +169,5 @@ GROUPS = {
                      "ILC3", "Erythroid", "Megakaryocytes", "Progenitor",
                      "Alveolar macrophages","Erythrophagocytic macrophages", 
                      "Intermediate macrophages", "Intestinal macrophages","Mast cells"]
-
     }
 }

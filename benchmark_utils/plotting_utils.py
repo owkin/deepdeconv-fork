@@ -1,9 +1,42 @@
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import pandas as pd
 
 from typing import Dict
+from datetime import datetime
+from loguru import logger
+
+
+def plot_benchmark_correlations(df_all_correlations, save_path: str = "", save: bool = True):
+    """General function to plot benchmark correlations, and save them by default."""
+    def _get_groups(df, groupby_col):
+        """Returns grouped DataFrames if groupby_col exists and is not empty, else returns a list with the original df."""
+        if groupby_col in df.columns and df[groupby_col].notna().any():
+            return [group for _, group in df.groupby(groupby_col)]
+        return [df]
+    
+    plot_func_map = {
+        "sample_wise_correlation": plot_deconv_results,
+        "cell_type_wise_correlation": plot_deconv_results_group
+    }
+
+    for granularity in df_all_correlations.granularity.unique():
+        df_all_correlations_temp = df_all_correlations[df_all_correlations["granularity"] == granularity]
+        if "num_cells" in df_all_correlations_temp.columns and df_all_correlations_temp.num_cells.dropna().nunique() > 1:
+            # Multiple num_cells were computed
+            df_to_plot = df_all_correlations_temp[df_all_correlations_temp["correlation_type"] == "sample_wise_correlation"]
+            for group in _get_groups(df_to_plot, "sampling_method"):
+                plot_deconv_lineplot(group, save=save, save_path=save_path)
+        else:
+            # One pseudobulk num_cells or bulk
+            for correlation_type in df_all_correlations_temp["correlation_type"].unique():
+                df_to_plot = df_all_correlations_temp[df_all_correlations_temp["correlation_type"] == correlation_type]
+                plot_func = plot_func_map.get(correlation_type, plot_deconv_results)
+                for group in _get_groups(df_to_plot, "sampling_method"):
+                    plot_func(group, save=save, save_path=save_path)
+
 
 def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_details=False, save=False, filename="test"):
     """Plot the deconv results from sanity check 1"""
@@ -27,86 +60,106 @@ def plot_purified_deconv_results(deconv_results, only_fit_one_baseline, more_det
         plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
 
 
-def plot_deconv_results(correlations, save=False, filename="test"):
+def plot_deconv_results(correlations, save=False, save_path="", filename=""):
     """Plot the deconv correlation results from sanity checks 2 and 3."""
+    if filename == "":
+        granularity = correlations["granularity"].unique()[0]
+        if "sampling_method" in correlations.columns and isinstance(correlations["sampling_method"].unique()[0],str):
+            sampling_method = correlations["sampling_method"].unique()[0]
+            filename = f"{granularity}_{sampling_method}_sampling_correlation_boxplot"
+        else:
+            filename = f"{granularity}_correlation_boxplot"
+
+    correlations = correlations[["correlations","deconv_method"]]
     plt.clf()
     sns.set_style("whitegrid")
-    boxplot = sns.boxplot(correlations)
-    medians = correlations.median(numeric_only=True).round(4)
-    vertical_offset = (
-        correlations.median() * 0.0005
-    )  # for non-overlapping display
+    # Boxplot
+    boxplot = sns.boxplot(correlations, x="deconv_method", y="correlations", hue="deconv_method")
+    plt.xticks(rotation=90)
+    # Plot the medians
+    x_categories = [t.get_text() for t in boxplot.get_xticklabels()] # order of categories
+    medians = (
+        correlations.groupby("deconv_method")["correlations"]
+        .median()
+        .reindex(x_categories)  # ensure same order as x-axis
+        .round(4)
+    )
+    y_range = correlations["correlations"].max() - correlations["correlations"].min()
+    vertical_offset = y_range * 0.0005
     y_position = medians + vertical_offset
-    for xtick in range(len(medians)):  # show the median value
-        if np.isfinite(y_position[xtick]):
+    for xtick, method in enumerate(x_categories):
+        median_value = medians.loc[method]
+        if np.isfinite(median_value):
             boxplot.text(
                 xtick,
-                y_position[xtick],
-                medians[xtick],
+                y_position.loc[method],
+                f"{median_value:.4f}",
                 size="x-small",
-                color="w",
+                color="black",
+                ha="center",
                 weight="semibold",
             )
-    plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+        plt.savefig(f"{save_path}/{filename}.png", dpi=300)
 
-def plot_deconv_results_group(correlations_group, save=False, filename="test_group"):
+def plot_deconv_results_group(correlations_group, save=False, save_path="", filename=""):
     """Plot the deconv correlation results from sanity checks 2 and 3.
     per cell type.
     """
+    if filename == "":
+        granularity = correlations_group["granularity"].unique()[0]
+        if "sampling_method" in correlations_group.columns and isinstance(correlations_group["sampling_method"].unique()[0], str):
+            sampling_method = correlations_group["sampling_method"].unique()[0]
+            filename = f"{granularity}_{sampling_method}_sampling_cell_type_correlation_plot"
+        else:
+            filename = f"{granularity}_cell_type_plot"
+
+    df = correlations_group[["correlations","deconv_method", "cell_types"]]
+    df = df.fillna(0) # Replace NaN with zeros
     plt.clf()
     sns.set_style("whitegrid")
-    df = correlations_group.copy()
-    df["group"] = df.index.to_list()
-    df.set_index('group', inplace=True)
-    # Replace NaN with zeros
-    df = df.fillna(0)
-
-    # Bar plot
     plt.figure(figsize=(10, 6))
-
-    # Create a long-form DataFrame
-    df_melted = pd.melt(df.reset_index(), id_vars='group', var_name='Model', value_name='Correlation')
-
-    # Create a bar plot using seaborn
-    sns.barplot(x='group', y='Correlation', hue='Model', data=df_melted)
-
-    # Add legend
+    sns.barplot(x="cell_types", y="correlations", hue="deconv_method", data=df)
     plt.legend()
-
-    # Set plot labels and title
-    plt.xlabel('Cell Type')
-    plt.ylabel('Correlation')
-    plt.title('Bar Plot of Correlations by Cell Type and Model')
+    plt.xlabel("Cell Type")
+    plt.ylabel("Correlation")
+    plt.title("Bar Plot of Correlations by Cell Type and Model")
     plt.show()
     if save:
-        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+        plt.savefig(f"{save_path}/{filename}.png", dpi=300)
 
 def plot_deconv_lineplot(results: Dict[int, pd.DataFrame],
                          save=False,
-                         filename="sim_pseudobulk_lineplot"):
-    for key, df in results.items():
-        df = pd.melt(df,
-                    var_name='method',
-                    value_name='pcc',
-        )
-        df["n_cells"] = key
-        results[key] = df
-    df_results = pd.concat(results.values(), axis=0)
+                         save_path="",
+                         filename=""):
+    if filename == "":
+        granularity = results["granularity"].unique()[0]
+        sampling_method = results["sampling_method"].unique()[0]
+        filename = f"{granularity}_{sampling_method}_sampling_numcells_lineplot"
 
-    sns.lineplot(data=df_results,
-                 x="n_cells",
-                 y="pcc",
-                 hue="method")
+    results = results[["correlations","deconv_method", "num_cells"]]
+    plt.clf()
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(10, 6))
+    sns.lineplot(data=results,
+                 x="num_cells",
+                 y="correlations",
+                 hue="deconv_method")
 
     plt.title("Pearson correlation coefficient (vs) # sampled cells")
-    plt.xlabel('Cell Type')
-    plt.ylabel('Correlation')
+    plt.xlabel("Number of cells per pseudobulk")
+    plt.ylabel("Correlation")
     plt.show()
 
     if save:
-        plt.savefig(f"/home/owkin/project/plots/{filename}.png", dpi=300)
+        path = f"/home/owkin/project/plots/{filename}.png"
+        if os.path.isfile(path):
+            new_path = f"/home/owkin/project/plots/{filename}_{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}.png"
+            logger.warning(f"{path} already exists. Saving file on this path instead: {new_path}")
+            path = new_path
+        plt.savefig(f"{save_path}/{filename}.png", dpi=300)
+        logger.debug(f"Plot saved to the following path: {save_path}/{filename}.png")
+
 
 def plot_metrics(model_history, train: bool = True, n_epochs: int = 100):
     """Plot the train or val metrics from training."""
@@ -241,6 +294,12 @@ def compare_tuning_results(
     
     custom_palette = sns.color_palette("husl", n_colors=len(all_results[variable_tuned].unique()))
     all_results["epoch"] = all_results.index
+    if (n_nan := all_results[variable_to_plot].isna().sum()) > 0:
+        print(
+            f"There are {n_nan} missing values in the variable to plot ({variable_to_plot})."
+            "Filling them with the next row values."
+        )
+        all_results[variable_to_plot] = all_results[variable_to_plot].fillna(method='bfill')
     sns.set_theme(style="darkgrid")
     sns.lineplot(x="epoch", y=variable_to_plot, hue=variable_tuned, ci="sd", data=all_results, err_style="bars", palette=custom_palette)
     plt.show()

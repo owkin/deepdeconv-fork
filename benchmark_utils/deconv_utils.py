@@ -1,155 +1,135 @@
 """Deconvolution benchmark utilities."""
 
-import anndata as ad
-import pandas as pd
+from __future__ import annotations
+
 import numpy as np
-from typing import Optional, Union
-import scvi
-from scipy.special import softmax
-
-from typing import Optional
-import scipy.stats
+import os
+import pandas as pd
+from loguru import logger
 from sklearn.linear_model import LinearRegression
+from typing import Optional
 
-import torch
+from .pseudobulk_dataset_utils import launch_evaluation_pseudobulk_samplings
+from .run_benchmark_constants import (
+    initialize_func,
+    DECONV_METHODS,
+    MODEL_TO_FIT,
+    SIGNATURE_MATRIX_MODELS,
+    SIGNATURE_TO_GRANULARITY,
+)
 
 
-def perform_nnls(signature: pd.DataFrame,
-                 adata_pseudobulk: ad.AnnData) -> pd.DataFrame:
-    """Perform deconvolution using the nnls method.
-    It will be performed as many times as there are samples in averaged_data.
+def initialize_deconv_methods(
+    deconv_methods: list,
+    all_data: dict,
+    granularity: str,
+    train_dataset: str,
+    signature_matrices: list,
+):
+    """General function to initialize and fit deconvolution methods in the benchmark.
 
-    Paramaters
+    Parameters
     ----------
-    signature: pd.DataFrame
-        Signature matrix of shape (n_genes, n_cell_types)
-    adata_pseudobulk: ad.AnnData
-        AnnData object of shape (n_samples, n_genes) | relative counts
+    deconv_methods: list
+        The list of deconvolution methods to initialize and, if appropriate, fit.
+    all_data: dict
+        The data dictionary contraining the training dataset and signature matrices.
+    granularity: str
+        The cell type granularity for deconvolution to use.
+    train_dataset: str
+        The dataset to train some deconvolution methods on.
+    signature_matrices: list
+        The signature matrices to use for some of the methods.
 
-    Returns
-    -------
+    Return
+    ------
+    deconv_methods_initialized: dict
+        The initialized and fitted deconvolution methods.
     """
+    deconv_methods_initialized = {}
+    for deconv_method in deconv_methods:
+        deconv_method_func, kwargs = initialize_func(DECONV_METHODS[deconv_method])
+        if (deconv_method in MODEL_TO_FIT)==(deconv_method in SIGNATURE_MATRIX_MODELS):
+            message = (
+                "The codebase is not formatted yet to have a deconvolution method "
+                "needing both to be fit and a user-provided signature matrix, or none "
+                "of these two options. It needs one of these options only."
+            )
+            logger.error(message)
+            raise NotImplementedError(message)
+        if deconv_method in MODEL_TO_FIT:
+            logger.debug(f"Training deconvolution method {deconv_method}...")
+            all_train_dset = all_data["datasets"][train_dataset]
+            train_dset = all_train_dset["dataset"][
+                all_train_dset[granularity]["Train index"]
+            ]
+            kwargs["adata_train"] = train_dset
+            kwargs["adata_train"].obs = kwargs["adata_train"].obs.rename(
+                {f"cell_types_grouped_{granularity}": "cell_types_grouped"},
+                axis = 1
+            )
+            if "adata_pseudobulk" in kwargs:
+                train_pseudobulks = launch_evaluation_pseudobulk_samplings(
+                    evaluation_pseudobulk_sampling="DIRICHLET", # "UNIFORM"
+                    all_data=all_data,
+                    evaluation_dataset=train_dataset,
+                    granularity=granularity,
+                    n_cells_per_evaluation_pseudobulk=100,
+                    n_samples_evaluation_pseudobulk=500,
+                )
+                kwargs["adata_pseudobulk"] = train_pseudobulks["adata_pseudobulk_test_counts"]
+            deconv_method_initialized = deconv_method_func(**kwargs)
+            deconv_methods_initialized[deconv_method] = deconv_method_initialized
+        elif deconv_method in SIGNATURE_MATRIX_MODELS:
+            for signature_matrix in signature_matrices:
+                if SIGNATURE_TO_GRANULARITY[signature_matrix]==granularity:
+                    kwargs["signature_matrix_name"] = signature_matrix
+                    kwargs["signature_matrix"] = all_data["signature_matrices"][
+                        signature_matrix
+                    ]
+                    deconv_method_initialized = deconv_method_func(**kwargs)
+                    deconv_methods_initialized[
+                        f"{deconv_method}_{signature_matrix}"
+                    ] = deconv_method_initialized
+    
+    logger.debug("Initialization of the deconvolution methods complete.")
+    return deconv_methods_initialized
+
+
+def use_nnls_method(to_deconvolve: pd.DataFrame, signature_matrix: pd.DataFrame):
+    """Apply NNLS on data to deconvolve.
+    """
+    # Gene intersection with signature matrix
+    gene_intersection = signature_matrix.index.intersection(to_deconvolve.index)
+    to_deconvolve = to_deconvolve.loc[gene_intersection]
+    signature_matrix = signature_matrix.loc[gene_intersection]
+    # Run NNLS
     deconv = LinearRegression(positive=True).fit(
-        signature, adata_pseudobulk.layers["counts"].T
+        signature_matrix, to_deconvolve
     )
     deconv_results = pd.DataFrame(
-        deconv.coef_, index=adata_pseudobulk.obs_names, columns=signature.columns
+        deconv.coef_, index=to_deconvolve.columns, columns=signature_matrix.columns
     )
     deconv_results = deconv_results.div(
         deconv_results.sum(axis=1), axis=0
     )  # to sum up to 1
+    
     return deconv_results
 
 
-def perform_latent_deconv(adata_pseudobulk: ad.AnnData,
-                          adata_latent_signature: ad.AnnData,
-                          model: Optional[Union[scvi.model.SCVI,
-                                                scvi.model.MixUpVI,
-                                                scvi.model.CondSCVI]],
-                          all_adata_samples,
-                          use_mixupvi: bool = True,
-                          use_nnls: bool = True,
-                          use_softmax: bool = False) -> pd.DataFrame:
-    """Perform deconvolution in latent space using the nnls method.
-
-    Parameters
-    ----------
-    adata_pseudobulk: ad.AnnData
-        Pseudobulk AnnData object of shape (n_samples, n_genes) | counts
-    adata_latent_signature: ad.AnnData
-        Latent signature AnnData object of shape (n_genes, n_cell_types)
-    model:
-        Generative model to use for latent space deconvolution
-    use_nnls: bool
-        Whether to use nnls or not
-    use_softmax: bool
-        Whether to use softmax or not
-
-    Returns
-    -------
-    deconv_results: pd.DataFrame
-        Deconvolution results of shape (n_samples, n_cell_types)
+def save_deconvolution_results(deconv_results: dict, experiment_path):
     """
-    # with torch.no_grad():
-    if use_mixupvi:
-        latent_pseudobulks=[]
-        for i in range(len(all_adata_samples)):
-            latent_pseudobulks.append(model.get_latent_representation(all_adata_samples[i], get_pseudobulk=True))
-        latent_pseudobulk = np.concatenate(latent_pseudobulks, axis=0)
-    else:
-        adata_pseudobulk = ad.AnnData(X=adata_pseudobulk.layers["counts"],
-                                    obs=adata_pseudobulk.obs,
-                                    var=adata_pseudobulk.var)
-        adata_pseudobulk.layers["counts"] = adata_pseudobulk.X.copy()
-
-        latent_pseudobulk = model.get_latent_representation(adata_pseudobulk)
-
-    if use_nnls:
-        deconv = LinearRegression(positive=True).fit(adata_latent_signature.X.T,
-                                                    latent_pseudobulk.T)
-        deconv_results = pd.DataFrame(
-            deconv.coef_,
-            index=adata_pseudobulk.obs_names,
-            columns=list(adata_latent_signature.obs["cell type"].values)
-        )
-        deconv_results = deconv_results.div(
-            deconv_results.sum(axis=1), axis=0
-        )  # to sum up to 1
-    else:
-        deconv = LinearRegression().fit(adata_latent_signature.X.T,
-                                        latent_pseudobulk.T)
-        if use_softmax:
-            deconv_results = softmax(deconv.coef_, axis=1)
-            deconv_results = pd.DataFrame(
-                deconv_results,
-                index=adata_pseudobulk.obs_names,
-                columns=list(adata_latent_signature.obs["cell type"].values)
-            )
-        else:
-            deconv_results = pd.DataFrame(
-                np.abs(deconv.coef_),
-                index=adata_pseudobulk.obs_names,
-                columns=list(adata_latent_signature.obs["cell type"].values)
-            )
-            deconv_results = deconv_results.div(
-                deconv_results.sum(axis=1), axis=0
-            )  # to sum up to 1
-    return deconv_results
-
-
-def compute_correlations(deconv_results, ground_truth_fractions):
-    """Compute n_sample pairwise correlations between the deconvolution results and the
-    ground truth fractions of the n_groups (here n cell types).
     """
-    deconv_results = deconv_results[
-        ground_truth_fractions.columns
-    ]  # to align order of columns
-    correlations = [
-        scipy.stats.pearsonr(
-            ground_truth_fractions.iloc[i], deconv_results.iloc[i]
-        ).statistic
-        for i in range(len(deconv_results))
-    ]
-    correlations = pd.DataFrame({"correlations": correlations})
-    return correlations
-
-
-def compute_group_correlations(deconv_results, ground_truth_fractions):
-    """Compute n_groups (here n cell types) pairwise correlations between the
-    deconvolution results and ground truth fractions of the n_samples.
-    """
-    deconv_results = deconv_results[
-        ground_truth_fractions.columns
-    ]  # to align order of columns
-    correlations = [
-        scipy.stats.pearsonr(
-            ground_truth_fractions.T.iloc[i], deconv_results.T.iloc[i]
-        ).statistic
-        for i in range(len(deconv_results.T))
-    ]
-    correlations = pd.DataFrame({"correlations": correlations})
-    return correlations
-
+    for granularity, sub_dict in deconv_results.items():
+        granularity_dir = os.path.join(experiment_path, str(granularity))
+        os.makedirs(granularity_dir, exist_ok=True)
+        
+        for key, value in sub_dict.items():
+            if isinstance(value, dict):
+                save_deconvolution_results(value, os.path.join(granularity_dir, key))
+            else:                
+                value.to_csv(os.path.join(granularity_dir, f"{key}.csv"))
+    
 
 def create_random_proportion(
     n_classes: int, n_non_zero: Optional[int] = None

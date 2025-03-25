@@ -7,7 +7,8 @@ import pandas as pd
 import random
 import torch
 
-from .dataset_utils import create_anndata_pseudobulk
+from constants import SIGNATURE_TYPE
+from .pseudobulk_dataset_utils import create_anndata_pseudobulk
 
 
 def create_latent_signature(
@@ -16,7 +17,6 @@ def create_latent_signature(
     repeats: int = 1,
     average_all_cells: bool = True,
     sc_per_pseudobulk: int = 3000,
-    signature_type: str = "pre-encoded",
     cell_type_column: str = "cell_types_grouped",
     count_key: Optional[str] = "counts",
     representation_key: Optional[str] = "X_scvi",
@@ -101,34 +101,36 @@ def create_latent_signature(
                     )
                     adata_sampled = adata[sampled_cells]
 
-                if signature_type == "pre-encoded":
-                    assert (
-                        model is not None,
-                        "If representing a purified pseudo bulk (aggregate before embedding",
-                        "), must give a model",
-                    )
-                    assert (
-                        count_key is not None
-                    ), "Must give a count key if aggregating before embedding."
-                    
-                    if use_mixupvi:
-                        result = model.get_latent_representation(
-                            adata_sampled, get_pseudobulk=True
-                        ).reshape(-1)
-                    else:
+                assert (
+                    model is not None,
+                    "If representing a purified pseudo bulk (aggregate before embedding",
+                    "), must give a model",
+                )
+                assert (
+                    count_key is not None
+                ), "Must give a count key if aggregating before embedding."
+                
+                if use_mixupvi:
+                    # TODO: in this case, n_cells sampled will be equal to self.n_cells_per_pseudobulk by mixupvae
+                    # so change that to being equal to either all cells (if average_all_cells) or sc_per_pseudobulk
+                    result = model.get_latent_representation(
+                        adata_sampled, get_pseudobulk=True
+                    )[0] # take first pseudobulk
+                else:
+                    if SIGNATURE_TYPE == "pre_encoded":
                         pseudobulk = (
                             adata_sampled.layers[count_key].mean(axis=0).reshape(1, -1)
-                        )  # .astype(int).astype(numpy.float32)
-                        adata_pseudobulk = create_anndata_pseudobulk(
-                            adata_sampled, pseudobulk
                         )
-                        result = model.get_latent_representation(adata_pseudobulk).reshape(
-                            -1
+                        adata_sampled = create_anndata_pseudobulk(
+                            adata_sampled.obs, adata_sampled.var_names, pseudobulk
                         )
-                else:
-                    raise ValueError(
-                        "Only pre-encoded signatures are supported for now."
+                    result = model.get_latent_representation(
+                        adata_sampled,
                     )
+                    if SIGNATURE_TYPE == "pre_encoded":
+                        result = result.reshape(-1)
+                    elif SIGNATURE_TYPE == "post_inference":
+                        result = result.mean(axis=0)
                 repeat_list.append(repeat)
                 representation_list.append(result)
                 cell_type_list.append(cell_type)

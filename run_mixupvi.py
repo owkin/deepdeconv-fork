@@ -102,14 +102,15 @@ else:
 
 # %% Load model / results: Uncomment if not running previous cells
 # if TUNE_MIXUPVI:
-#     path = "/home/owkin/project/mixupvi_tuning/n_latent-seed/CTI_PROCESSED_dataset_tune_mixupvi_2024-02-21-11:25:28"
+#     path = "/home/owkin/project/mixupvi_tuning/n_latent-seed/CTI_dataset_tune_mixupvi_2024-06-07-18:30:37"
 #     all_results = read_tuning_results(f"{path}/tuning_results.csv")
 #     search_space = read_search_space(f"{path}/search_space.pkl")
-#     best_hp = search_space["best_hp"]
-#     model_history = all_results.copy()
-#     for variable in best_hp : 
-#         # plots for the best hp found by tuning
-#         model_history = model_history.loc[model_history[variable] == best_hp[variable]]
+#     if "best_hp" in search_space:
+#         best_hp = search_space["best_hp"]
+#         model_history = all_results.copy()
+#         for variable in best_hp : 
+#             # plots for the best hp found by tuning
+#             model_history = model_history.loc[model_history[variable] == best_hp[variable]]
 # else:
 #     import torch
 #     model = torch.load(f"{model_path}/model.pt")
@@ -130,17 +131,19 @@ plot_kl_loss(model_history, n_epochs=n_epochs)
 
 # %% Plots to compare HPs
 if TUNE_MIXUPVI:
-    n_epochs = len(model_history["train_loss_epoch"])
-    hp_index_to_plot = None
-    # hp_index_to_plot = [1, 2, 3] # only these index (of the HPs tried) will be plotted, for clearer visualisation
+    n_epochs = len(set(all_results["train_loss_epoch"].index))
+    # hp_index_to_plot = None
+    hp_index_to_plot = [0,1] # only these index (of the HPs tried) will be plotted, for clearer visualisation
 
-    if len(best_hp) == 1 or (len(best_hp) == 2 and "seed" in best_hp):
-        tuned_variable = list(set(best_hp.keys()) - {"seed"})[0]
+    tuned_hps = all_results.T.loc[["train" not in col and "validation" not in col for col in all_results.columns]].index
+    if len(tuned_hps) == 1 or (len(tuned_hps) == 2 and "seed" in tuned_hps):
+        variable_tuned = list(set(tuned_hps) - {"seed"})[0]
+        # variable_tuned = "seed"
         for variable_to_plot in all_results.columns:
             if "validation" in variable_to_plot:
                 compare_tuning_results(
-                    all_results, variable_to_plot=variable_to_plot, 
-                    variable_tuned=tuned_variable, n_epochs=n_epochs, 
+                    all_results.copy(), variable_to_plot=variable_to_plot, 
+                    variable_tuned=variable_tuned, n_epochs=n_epochs, 
                     hp_index_to_plot=hp_index_to_plot,
                 )
     else:
