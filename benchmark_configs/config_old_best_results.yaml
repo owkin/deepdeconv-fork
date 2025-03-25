@@ -1,0 +1,13 @@
+## A test config to run the benchmark
+
+deconv_methods: ["NNLS", "MixUpVI", "TAPE", "Scaden", "scVI", "DestVI"]
+evaluation_datasets: ["CTI"]
+granularities: ["2nd_level_granularity"]
+evaluation_pseudobulk_samplings: ["DIRICHLET"]
+n_samples_evaluation_pseudobulk: 500
+n_cells_per_evaluation_pseudobulk: [250]
+signature_matrices: ["CTI_2nd_level_granularity"]
+train_dataset: "CTI"
+n_variable_genes: 2000
+experiment_name: "previous_all_methods_2nd_level_granularity" # if None, a random name will be chosen
+save: True # if False, only the plots will be saved

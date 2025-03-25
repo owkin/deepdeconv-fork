@@ -87,6 +87,19 @@ git checkout -b {your-branch-name}
 I you want to use a GPU, make sure to create a workspace with a GPU in *Abstra*.
 Please be sure to install a version of [PyTorch](https://pytorch.org/) that is compatible with your GPU (if applicable).
 
+# MixUpVI and deconvolution benchmark
+
+MixUpVI is a model derived from scVI that creates a latent space in which the assumptions of NNLS are inherently met, thus allowing for latent deconvolution. Different resources are:
+- `scvi.model._mixupvi.py`: The MixUpVI model.
+- `run_mixupvi.py`: The script to train and/or tune the MixUpVI model.
+- `run_benchmark.py`: The deconvolution benchmarking pipeline, where one can compare any added deconvolution model on bulk / simulated pseudobulk tasks.
+
+To run the benchmark, one should:
+- Create their own `config.yaml` config file within the `benchmark_configs` folder.
+- Every possible config parameter is explained within the `@dataclass` of the `RunBenchmarkConfig` inside `run_benchmark_config_dataclass.py` in which value compatibilities of the different provided arguments are checked.
+- To run a benchmark with the created config, run inside a terminal `python /home/owkin/deepdeconv-fork/run_benchmark.py --config /home/owkin/deepdeconv-fork/benchmark_configs.config.yaml`.
+- If inside the config, `save: True`, then every output of the experiment will be saved inside `/home/owkin/project/run_benchmark_experiments/{your_experiment_name}`. Otherwise, only final plots will be saved there.
+
 # Resources
 
 -   Tutorials, API reference, and installation guides are available in
