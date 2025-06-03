@@ -28,7 +28,7 @@ buildSignatureMatrix <- function(NameSig,expression,clusters,output_dir,diff.cut
   }
   names(NGenes) <- IDsCells
   write.table(NGenes,file.path(output_dir,paste0("Overview_Nmarkers_",diff.cutoff,"_",pvaladj.cutoff,"_",minG,"_",maxG,".txt")))
-  #if(max(NGenes) < maxG){maxG <- max(NGenes)} 
+  #if(max(NGenes) < maxG){maxG <- max(NGenes)}
 
   conditionNumbers<-c()
   ntop <- c()
@@ -104,7 +104,7 @@ buildSignatureMatrix_Seurat <- function(NameSig,expression,clusters,output_dir,d
   }
   names(NGenes) <- IDsCells
   write.table(NGenes,file.path(output_dir,paste0("Overview_Nmarkers_",diff.cutoff,"_",pvaladj.cutoff,"_",minG,"_",maxG,".txt")))
-  #if(max(NGenes) < maxG){maxG <- max(NGenes)} 
+  #if(max(NGenes) < maxG){maxG <- max(NGenes)}
 
   conditionNumbers<-c()
   ntop <- c()
@@ -159,5 +159,3 @@ buildSignatureMatrix_Seurat <- function(NameSig,expression,clusters,output_dir,d
   dev.off()
   return(Sig)
 }
-
-

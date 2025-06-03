@@ -1,4 +1,4 @@
-## CREATION OF ENVIRONMENT: 
+## CREATION OF ENVIRONMENT:
 
 # Initialize conda in terminal and choose shell (bash or zsh. To checkout available shells simply enter conda init)
 conda init bash
@@ -13,9 +13,9 @@ env_name="R_environnement"
 
 # OPTION 1: in a specicic folder (ONLY do if enough space on workspace)
 # This option avoids loss of environment when server crashes
-conda create -c conda-forge --yes --prefix /home/owkin/.conda/envs/$env_name mamba 
+conda create -c conda-forge --yes --prefix /home/owkin/.conda/envs/$env_name mamba
 
-# Activate environment: 
+# Activate environment:
 conda activate /home/owkin/.conda/envs/$env_name
 
 # To avoid long path of environment each time it is activated:
@@ -55,8 +55,8 @@ mamba install --yes r-languageserver
 mamba install --yes bioconductor-fgsea
 mamba install --yes r-msigdbr
 mamba install --yes bioconductor-deseq2
-mamba install --yes r-circlize 
-mamba install --yes r r-tidyverse     
+mamba install --yes r-circlize
+mamba install --yes r r-tidyverse
 mamba install --yes bioconductor-consensusclusterplus
 mamba install --yes bioconductor-complexheatmap
 mamba install --yes bioconductor-genomeinfodb
@@ -138,14 +138,14 @@ mamba install --yes -c anaconda jupyter
 mamba install --yes -c anaconda ipykernel
 
 ### Specific
-mamba install --yes pandas numpy plotnine 
+mamba install --yes pandas numpy plotnine
 mamba install --yes patchwork #useful library for layouts of plots like ggplot
 mamba install --yes boto3 # retrieval of aws buckets
 
 
 
 
-### MANUAL INSTALLATION OF R PACKAGES SO THAT R WORKS IN NOTEBOOKS 
+### MANUAL INSTALLATION OF R PACKAGES SO THAT R WORKS IN NOTEBOOKS
 ### Note that it only work on this version of R, select this kernel in R notebooks
 #/workspace/envs/${env_name}/bin/Rscript -e "install.packages('IRkernel', repos='http://cran.us.r-project.org')"
 #/workspace/envs/${env_name}/bin/Rscript -e "IRkernel::installspec()"
@@ -153,7 +153,7 @@ mamba install --yes boto3 # retrieval of aws buckets
 
 ##DEBUGGING: If having problems installing some of the packages above:
 
-# If not able to install IRKernel from R: 
+# If not able to install IRKernel from R:
 #conda install --yes -c conda-forge r-irkernel
 
 # Problem to install IRkernel::installspec()" : need to install first jupyter client and genutils
@@ -161,6 +161,6 @@ mamba install --yes boto3 # retrieval of aws buckets
 #pip install --upgrade setuptools pip
 #pip install ipython_genutils
 
-# Problems to select R kernel do the following: 
+# Problems to select R kernel do the following:
 #python3 -m pip install ipykernel
 #python3 -m ipykernel install --user

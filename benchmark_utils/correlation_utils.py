@@ -7,14 +7,16 @@ import scipy.stats
 from loguru import logger
 
 from .run_benchmark_constants import (
-    initialize_func,
     CORRELATION_FUNCTIONS,
     GRANULARITY_TO_EVALUATION_DATASET,
     SINGLE_CELL_DATASETS,
+    initialize_func,
 )
 
 
-def compute_benchmark_correlations(deconv_results: dict, correlation_type: str) -> pd.DataFrame:
+def compute_benchmark_correlations(
+    deconv_results: dict, correlation_type: str
+) -> pd.DataFrame:
     """General function to compute different benchmark correlations.
 
     Parameters
@@ -47,7 +49,9 @@ def compute_benchmark_correlations(deconv_results: dict, correlation_type: str) 
                                 "correlation computation will be skipped there."
                             )
                         else:
-                            df_corr = compute_correlation_fn(level4["deconvolution_results"], level4["ground_truth"])
+                            df_corr = compute_correlation_fn(
+                                level4["deconvolution_results"], level4["ground_truth"]
+                            )
                             df_corr["deconv_method"] = deconv_method
                             df_corr["num_cells"] = num_cells
                             df_corr["sampling_method"] = sampling_method
@@ -66,7 +70,9 @@ def compute_benchmark_correlations(deconv_results: dict, correlation_type: str) 
                     )
 
                 else:
-                    df_corr = compute_correlation_fn(level2["deconvolution_results"], level2["ground_truth"])
+                    df_corr = compute_correlation_fn(
+                        level2["deconvolution_results"], level2["ground_truth"]
+                    )
                     df_corr["deconv_method"] = deconv_method
                     df_corr["granularity"] = granularity
                     df_corr["correlation_type"] = correlation_type
@@ -78,8 +84,17 @@ def compute_benchmark_correlations(deconv_results: dict, correlation_type: str) 
 
 
 def compute_correlations(deconv_results, ground_truth_fractions):
-    """Compute n_sample pairwise correlations between the deconvolution results and the
+    """Compute pairwise correlations between deconvolution results and ground truth.
+
+    Computes n_sample correlations between the deconvolution results and the
     ground truth fractions of the n_groups (here n cell types).
+
+    Parameters
+    ----------
+    deconv_results : DataFrame
+        The deconvolution results to evaluate
+    ground_truth_fractions : DataFrame
+        The ground truth fractions to compare against
     """
     deconv_results = deconv_results[
         ground_truth_fractions.columns
@@ -96,8 +111,17 @@ def compute_correlations(deconv_results, ground_truth_fractions):
 
 
 def compute_group_correlations(deconv_results, ground_truth_fractions):
-    """Compute n_groups (here n cell types) pairwise correlations between the
+    """Compute cell type correlations between deconvolution results and ground truth.
+
+    Computes n_groups (here n cell types) pairwise correlations between the
     deconvolution results and ground truth fractions of the n_samples.
+
+    Parameters
+    ----------
+    deconv_results : DataFrame
+        The deconvolution results to evaluate
+    ground_truth_fractions : DataFrame
+        The ground truth fractions to compare against
     """
     deconv_results = deconv_results[
         ground_truth_fractions.columns

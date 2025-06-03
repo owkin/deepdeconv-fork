@@ -21,7 +21,7 @@ ensdb_hsapiens_v86_genes <- data.table::fread(annot_genes_prevv)
 
 # Annotate ensembl genes to HGNC
 # Calculate standard deviation (sd) of expression per gene
-cts_annot_df <- data.frame("Ensembl" = rownames(cts), "sd" = apply(cts, 1, sd)) %>% 
+cts_annot_df <- data.frame("Ensembl" = rownames(cts), "sd" = apply(cts, 1, sd)) %>%
 dplyr::left_join(annot_ensdb_df, by = "Ensembl")
 
 # Keep HGNC with highest standard deviation if duplicated
@@ -39,7 +39,7 @@ ensg_missing_hgnc <- cts_annot_clean_df$Ensembl[ensg_missing_hgnc_index]
 cts_annot_clean_df$HGNC[ensg_missing_hgnc_index] <-
 ensdb_hsapiens_v86_genes$HGNC[match(ensg_missing_hgnc, ensdb_hsapiens_v86_genes$Ensembl)]
 
-print(paste(cts_annot_clean_df$Ensembl[ensg_missing_hgnc_index], 
+print(paste(cts_annot_clean_df$Ensembl[ensg_missing_hgnc_index],
             ": HGNC missing in Ensembl v99 version. Replaced with HGNC values from Ensembl v86:",
     cts_annot_clean_df$HGNC[ensg_missing_hgnc_index]))
 

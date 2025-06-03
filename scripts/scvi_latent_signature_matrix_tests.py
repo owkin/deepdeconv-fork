@@ -3,18 +3,18 @@
 The corresponding notebook can be found as linearity_checks.ipynb.
 """
 
+import random
 from typing import Optional, Union
 
-from scvi_sanity_checks_utils import create_anndata_pseudobulk
-import matplotlib.pyplot as plt
-import scvi
-import scanpy as sc
-import random
-import numpy as np
 import anndata as ad
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import scanpy as sc
 from scipy.optimize import nnls
+from scvi_sanity_checks_utils import create_anndata_pseudobulk
 
+import scvi
 
 # Loading models trained by Khalil
 
@@ -133,7 +133,6 @@ def make_cell_type_representations(
 ) -> ad.AnnData:
     """Make cell type representations from a single cell dataset represented with scvi.
 
-
     From an annotated single cell dataset (adata), for each cell type, (found in the
     cell_type column of obs in adata), we create "repeats" representation in the
     following way.
@@ -201,10 +200,9 @@ def make_cell_type_representations(
             adata_sampled = adata[sampled_cells]
 
             if aggregate_before_embedding:
-                assert (
-                    model is not None,
-                    "If representing a purified pseudo bulk (aggregate before embedding",
-                    "), must give a model",
+                assert model is not None, (
+                    "If representing a purified pseudo bulk (aggregate before embedding), "
+                    "must give a model"
                 )
                 assert (
                     count_key is not None
@@ -236,6 +234,13 @@ def make_cell_type_representations(
 
 
 def visualize_cell_type_representations(cell_type_representations: ad.AnnData):
+    """Visualize the cell type representations.
+
+    Parameters
+    ----------
+    cell_type_representations : ad.AnnData
+        The cell type representations
+    """
     sc.pp.neighbors(cell_type_representations, use_rep="X")
     sc.tl.umap(cell_type_representations, min_dist=0.3)
     print("Plotting a UMAP")
@@ -446,7 +451,6 @@ def make_signature(
 ) -> tuple[np.ndarray, list[str]]:
     """Make cell type representations from a single cell dataset represented with scvi.
 
-
     From an annotated single cell dataset (adata), for each cell type, (found in the
     cell_type column of obs in adata), we create a signature representation in the
     following way.
@@ -615,7 +619,6 @@ def make_experiment_dataframe(
             max_non_zero = dimension_latent_space
 
         for pseudobulk_number in range(pseudobulks_per_experiment):
-
             for n_non_zero in range(1, max_non_zero):
                 proportions = create_random_proportion(
                     n_classes=number_cell_types, n_non_zero=n_non_zero

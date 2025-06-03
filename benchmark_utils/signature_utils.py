@@ -1,8 +1,6 @@
 """Different python functions useful for sanity checks in deconvolution."""
 
-import anndata as ad
 import pandas as pd
-import mygene
 
 
 def create_signature(
@@ -56,13 +54,13 @@ def create_signature(
 def read_txt_r_signature(path):
     """Read a .txt signature matrix coming from R script."""
     signature_almudena = []
-    with open(path, "r") as file:
+    with open(path) as file:
         for line in file:
             temp = []
             for elem in line.split("\t"):
                 try:
                     temp.append(float(elem))
-                except:
+                except ValueError:
                     elem = elem.replace('"', "")
                     elem = elem.replace("\n", "")
                     temp.append(elem)
@@ -77,11 +75,19 @@ def read_txt_r_signature(path):
 
 
 def map_hgnc_to_one_ensg(gene_names, adata):
-    """
+    """Map a HGNC symbol to a single ENSG symbol.
+
     If a HGNC symbol map to multiple ENSG symbols, choose the one that is in the
     single cell dataset.
     If the HGNC symbol maps to multiple ENSG symbols even inside the scRNAseq dataset,
     then the last one is chosen (no rationale).
+
+    Parameters
+    ----------
+    gene_names : list
+        The list of HGNC symbols to map to ENSG symbols
+    adata : AnnData
+        The AnnData object to map the HGNC symbols to ENSG symbols
     """
     chosen_gene = None
     for gene_name in gene_names:
@@ -91,9 +97,17 @@ def map_hgnc_to_one_ensg(gene_names, adata):
 
 
 def map_hgnc_to_ensg(genes, adata):
-    """
+    """Map the HGNC symbols to ENSG symbols.
+
     Map the HGNC symbols from the signature matrix to the corresponding ENSG symbols
     of the scRNAseq dataset.
+
+    Parameters
+    ----------
+    genes : pd.DataFrame
+        The dataframe containing the HGNC symbols and their corresponding ENSG symbols
+    adata : AnnData
+        The AnnData object to map the HGNC symbols to ENSG symbols
     """
     ensg_names = []
     for gene in genes.index:

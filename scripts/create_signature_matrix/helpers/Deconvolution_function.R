@@ -92,7 +92,7 @@ Deconvolution <- function(T,C){
 
 
     names(out) <- methods
-    
+
     return(out)
 
 }
@@ -225,7 +225,7 @@ solveSVR<-function(S,B){
   lb=min(c(as.vector(S),B)) #lower bound
   Bs=((B-lb)/ub)*2-1
   Ss=((S-lb)/ub)*2-1
-  
+
   #perform SVR
   model<-svm(Ss,Bs, nu=0.5,scale = TRUE, type = "nu-regression",kernel ="linear",cost = 1)
   coef <- t(model$coefs) %*% model$SV
@@ -242,14 +242,14 @@ DEAnalysis<-function(scdata,id,path){
   exprObj2<-SetIdent(exprObj,ident.use=as.vector(id))
   print("Calculating differentially expressed genes:")
   for (i in unique(id)){
-    de_group <- FindMarkers(object=exprObj2, ident.1 = i, ident.2 = NULL, 
+    de_group <- FindMarkers(object=exprObj2, ident.1 = i, ident.2 = NULL,
                              only.pos = TRUE, test.use = "bimod")
     save(de_group,file=paste(path,"/de_",i,".RData",sep=""))
   }
 }
 
 ########################################################################################################################################## scdc
-## downloaded from https://meichendong.github.io/SCDC/reference/deconv_simple.html   
+## downloaded from https://meichendong.github.io/SCDC/reference/deconv_simple.html
 
 #######################################
 ####### DECONVOLUTION FUNCTIONS #######
@@ -1573,5 +1573,3 @@ deconv_simple <- function(count.filter.norm, basis.norm, iter.max = 2000, nu = 1
   rownames(prop.est.mvw) <- colnames(count.filter.norm)
   return(list(prop.est.mvw = prop.est.mvw))
 }
-
-

@@ -130,3 +130,10 @@ poetry.lock
 *.pt
 *.h5ad
 notebooks/ulysse_explo.ipynb
+/ray
+/experiments
+/project
+.vscode/launch.json
+.github/workflows/build.yml
+.github/workflows/release.yml
+.github/workflows/test.yml

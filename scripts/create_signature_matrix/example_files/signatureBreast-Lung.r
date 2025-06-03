@@ -8,7 +8,7 @@ library(dplyr)
 library(plyr)
 library(ggforce)
 library(ggplot2)
-library(reshape2) 
+library(reshape2)
 library(ComplexHeatmap)
 library(corrplot)
 library(caret)
@@ -47,9 +47,9 @@ expr$Celltype2 <- ifelse(grepl("\\bFibro_muscle\\b",expr$Celltype2),"Stroma",exp
 # Removing mitochondrial and ribosomal genes
 #expr2 <- NormalizeData(object = expr2, normalization.method = "RC",scale.factor = 1e6)
 genes.ribomit <- grep(pattern = "^RP[SL][[:digit:]]|^RP[[:digit:]]|^RPSA|^RPS|^RPL|^MT-|^MRPL",rownames(expr))
-dim(expr) 
+dim(expr)
 expr <- expr[-c(genes.ribomit),]
-dim(expr) 
+dim(expr)
 # remove housekeeping genes and patient specific ones: ACTB, if only this one, not a big deal
 genes2remove = grep(pattern = "^ACTB$|TMSB4X|IGKC|^IG[HL]",rownames(expr))
 expr <- expr[-c(genes2remove),]
@@ -80,7 +80,7 @@ if(!file.exists(file.path(dir_out,"Chr_CHUV.txt"))){
       pvaladj.cutoff=0.05,diff.cutoff=0.5,
       minG=50,maxG=200)
   write.table(signature,file.path(dir_out,"Chr_CHUV.txt"),sep="\t",row.names=TRUE,col.names=NA)
-  
+
 }else{
   signature <- read.table(file.path(dir_out,"Chr_CHUV.txt"),sep="\t",row.names=1,header=TRUE)
 }
@@ -116,11 +116,11 @@ out2[,1] <- gsub("\\..*","",out2[,1])
 colnames(out2) <- c("Method","CellType","Fraction","Mix")
 out2 <- out2[which(out2$Mix == out2$CellType),]
 
-p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) + 
+p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) +
   geom_point() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ggsave(file.path(dir_out,"Sanity_Check_1","SC1.png"))
 
-p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) + 
+p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) +
   geom_point() + theme_bw() + scale_color_brewer(palette="Paired") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ggsave(file.path(dir_out,"Sanity_Check_1","SC1_2.png"))
 
@@ -129,7 +129,7 @@ summary <- out2 %>%
     group_by(Method) %>%
     summarise_at(vars(Fraction), list(name = mean))
 summary <- as.data.frame(summary)
-summary <- summary[order(-summary$name),] 
+summary <- summary[order(-summary$name),]
 write.table(summary,file.path(dir_out,"Sanity_Check_1","summary_frac.txt"),sep="\t",row.names=FALSE,col.names=TRUE)
 
 
@@ -176,8 +176,8 @@ correl_all <- data.frame(Sample=rep(seq(1:Nsampl),10),Method=rep(names(fractions
 write.table(correl_all,file.path(dir_out,"Sanity_Check_2","summary_correl.txt"),sep="\t",row.names=FALSE,col.names=TRUE)
 
 p_meds <- ddply(correl_all, .(Method), summarise, med = median(Correlation))
-p <- ggplot(correl_all, aes(x=Method, y=Correlation)) + 
-  geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ 
+p <- ggplot(correl_all, aes(x=Method, y=Correlation)) +
+  geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
     geom_text(data = p_meds, aes(x = Method, y = med, label = round(med,4)), size = 3, vjust = -6.5)
 ggsave(file.path(dir_out,"Sanity_Check_2","SC2.png"))
 
@@ -196,17 +196,17 @@ T <- c()
 for(i in 1:100){
   set.seed(i)
   Nprop <- runif(length(NcellType),0,1)
-    
-  Ncell <- c() 
+
+  Ncell <- c()
   expr_N <- c()
   for(CT in NcellType){
     temp <- eval(parse(text = as.character(CT)))
-    if(round(Nprop[which(NcellType == CT)]*100) == 0){next} 
+    if(round(Nprop[which(NcellType == CT)]*100) == 0){next}
     temp <- temp[,sample(colnames(temp),round(Nprop[which(NcellType == CT)]*50))]
     temp <-  GetAssayData(object = temp, assay.type = "RNA", slot = "data")
     temp <- t(temp)
     expr_N <- rbind(expr_N,temp)
-    Ncell <- c(Ncell,nrow(temp)) 
+    Ncell <- c(Ncell,nrow(temp))
   }
   total <- sum(Ncell)
   Ncell <- Ncell/total
@@ -235,6 +235,6 @@ for(i in 1:length(fractions)){
 correl_all <- data.frame(Method=rep(names(fractions),Nsampl),Correlation=correl_all[,1],Pvalue=correl_all[,2])
 write.table(correl_all,file.path(dir_out,"Sanity_Check_3","summary_correl.txt"),sep="\t",row.names=FALSE,col.names=TRUE)
 
-p <- ggplot(correl_all, aes(x=Method, y=Correlation)) + 
+p <- ggplot(correl_all, aes(x=Method, y=Correlation)) +
   geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ggsave(file.path(dir_out,"Sanity_Check_3","SC3.png"))

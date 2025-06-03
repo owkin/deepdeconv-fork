@@ -1,0 +1,30 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Set up Python
+              uses: conda-incubator/setup-miniconda@v2
+              with:
+                  activate-environment: deepdeconv
+                  environment-file: environment.yml
+                  python-version: 3.9
+                  auto-activate-base: false
+
+            - name: Install pre-commit
+              run: conda run -n deepdeconv pip install pre-commit
+
+            - name: Run pre-commit checks
+              run: conda run -n deepdeconv pre-commit run --all-files
+
+            - name: Run tests
+              run: conda run -n deepdeconv pytest -v tests/

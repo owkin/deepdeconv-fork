@@ -8,7 +8,7 @@ library(plyr)
 library(dplyr)
 library(ggforce)
 library(ggplot2)
-library(reshape2) 
+library(reshape2)
 library(ComplexHeatmap)
 library(corrplot)
 library(caret)
@@ -45,7 +45,7 @@ ad$obs$train_index <- train_test_cell_types$Train.index
 
 annot_genes_latestv  <-  "~/deepdeconv/scripts/create_signature_matrix/helpers/ensdb_hsapiens_v99.tsv" # This one covers everything in the CTI dataset
 annot_ensdb_df <- data.table::fread(annot_genes_latestv)
-cts_annot_df <- data.frame("Ensembl" = rownames(raw_X))  %>% 
+cts_annot_df <- data.frame("Ensembl" = rownames(raw_X))  %>%
 dplyr::left_join(annot_ensdb_df, by = "Ensembl")
 # Find duplicates
 duplicates <- cts_annot_df[which(duplicated(cts_annot_df$HGNC) | duplicated(cts_annot_df$HGNC, fromLast=TRUE)),]
@@ -77,8 +77,8 @@ dim(expr_clean)
 # Removing mitochondrial and ribosomal genes
 genes.ribomit <- grep(pattern = "^RP[SL][[:digit:]]|^RP[[:digit:]]|^RPSA|^RPS|^RPL|^MT-|^MRPL",rownames(expr_clean))
 expr_clean <- expr_clean[-c(genes.ribomit),]
-dim(expr_clean) 
-# Remove housekeeping genes and patient specific ones: ACTB if only this one, not a big deal. 
+dim(expr_clean)
+# Remove housekeeping genes and patient specific ones: ACTB if only this one, not a big deal.
 # In this context we can remove B2M and HLA-A, B or C. We can also remove H3 histone genes
 genes2remove = grep(pattern = "^ACTB$|TMSB4X|IGKC|^IG[HL]|HLA-[ABC]|B2M|UBC|^H3-|TPT1|ACTG1",rownames(expr_clean))
 expr_clean <- expr_clean[-c(genes2remove),]
@@ -122,7 +122,7 @@ if(!file.exists(file.path(dir_out, paste(name_signature,".txt", sep="")))){
       pvaladj.cutoff=0.05,diff.cutoff=0.5,
       minG=50,maxG=200)
   write.table(signature,file.path(dir_out,paste(name_signature,".txt", sep="")),sep="\t",row.names=TRUE,col.names=NA)
-  
+
 }else{
   signature <- read.table(file.path(dir_out,paste(name_signature,".txt", sep="")),sep="\t",row.names=1,header=TRUE)
 }

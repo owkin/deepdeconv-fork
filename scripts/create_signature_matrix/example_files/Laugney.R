@@ -3,8 +3,8 @@ library(dplyr)
 library(ggforce)
 library(ggplot2)
 library(RColorBrewer)
-library(reshape2) 
-library(GeoDiff) 
+library(reshape2)
+library(GeoDiff)
 library(SpatialDecon)
 library(ComplexHeatmap)
 library(Seurat)
@@ -23,18 +23,18 @@ library(MASS)
 library(Rodeo)
 library(plyr)
 
-output_dir <- "/mnt/disks/sdb/usr_data/DATA_ALMUDENA/Mosaic/Signatures"                  
+output_dir <- "/mnt/disks/sdb/usr_data/DATA_ALMUDENA/Mosaic/Signatures"
 dir.create(file.path(output_dir,"Laughney"))
-output_dir <- "/mnt/disks/sdb/usr_data/DATA_ALMUDENA/Mosaic/Signatures/Laughney"  
+output_dir <- "/mnt/disks/sdb/usr_data/DATA_ALMUDENA/Mosaic/Signatures/Laughney"
 
 ######## Loading functions
 source("~/Deconvolution/scr/Signature_functions.R")
 source("~/Deconvolution/scr/Deconvolution_function.R")
 source("~/Deconvolution/scr/Deconvolution_functions_DWLS.R")
-source("/home/aespin-perez/Deconvolution/scr/scdc.R") #downaloaded from https://meichendong.github.io/SCDC/reference/deconv_simple.html    
+source("/home/aespin-perez/Deconvolution/scr/scdc.R") #downaloaded from https://meichendong.github.io/SCDC/reference/deconv_simple.html
 
 ######## Loading dataset
-dir_sc <- "/data/datasets/Zenodo_input_data/data/12_input_adatas/" 
+dir_sc <- "/data/datasets/Zenodo_input_data/data/12_input_adatas/"
 ad <- read_h5ad(file.path(dir_sc,"laughney_massague_2020_nsclc.h5ad"))
 expr <- t(as.matrix(ad$X))
 obs <- ad$obs
@@ -59,9 +59,9 @@ expr2 <- expr2[,-roremove]
 # Removing mitochondrial and ribosomal genes
 #expr2 <- NormalizeData(object = expr2, normalization.method = "RC",scale.factor = 1e6)
 genes.ribomit <- grep(pattern = "^RP[SL][[:digit:]]|^RP[[:digit:]]|^RPSA|^RPS|^RPL|^MT-|^MRPL",rownames(expr2))
-dim(expr2) 
+dim(expr2)
 expr2 <- expr2[-c(genes.ribomit),]
-dim(expr2) 
+dim(expr2)
 
 # Grouping cell types
 obs2$MainImmune <- ifelse(obs2$cell_type %in% c("non-classical monocyte","macrophage","classical monocyte","alveolar macrophage","myeloid cell"),
@@ -114,7 +114,7 @@ if(!file.exists(file.path(output_dir,"Laughney.txt"))){
       pvaladj.cutoff=0.05,diff.cutoff=0.25,
       minG=50,maxG=200)
   write.table(signature,file.path(output_dir,"Laughney.txt"),sep="\t",row.names=TRUE,col.names=NA)
-  
+
 }else{
   signature <- read.table(file.path(output_dir,"Laughney.txt"),sep="\t",row.names=1,header=TRUE)
 }
@@ -145,11 +145,11 @@ out2[,1] <- gsub("\\..*","",out2[,1])
 colnames(out2) <- c("Method","CellType","Fraction","Mix")
 out2 <- out2[which(out2$Mix == out2$CellType),]
 
-p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) + 
+p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) +
   geom_point() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ggsave(file.path(output_dir,"Sanity_Check_1","SC1.png"))
 
-p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) + 
+p <- ggplot(out2, aes(x=CellType, y=Fraction, color=Method)) +
   geom_point() + theme_bw() + scale_color_brewer(palette="Paired") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ggsave(file.path(output_dir,"Sanity_Check_1","SC1_2.png"))
 
@@ -158,7 +158,7 @@ summary <- out2 %>%
     group_by(Method) %>%
     summarise_at(vars(Fraction), list(name = mean))
 summary <- as.data.frame(summary)
-summary <- summary[order(-summary$name),] 
+summary <- summary[order(-summary$name),]
 write.table(summary,file.path(output_dir,"Sanity_Check_1","summary_frac.txt"),sep="\t",row.names=FALSE,col.names=TRUE)
 
 
@@ -202,8 +202,8 @@ correl_all <- data.frame(Sample=rep(seq(1:Nsampl),10),Method=rep(names(fractions
 write.table(correl_all,file.path(output_dir,"Sanity_Check_2","summary_correl.txt"),sep="\t",row.names=FALSE,col.names=TRUE)
 
 p_meds <- ddply(correl_all, .(Method), summarise, med = median(Correlation))
-p <- ggplot(correl_all, aes(x=Method, y=Correlation)) + 
-  geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ 
+p <- ggplot(correl_all, aes(x=Method, y=Correlation)) +
+  geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
     geom_text(data = p_meds, aes(x = Method, y = med, label = round(med,4)), size = 3, vjust = -6.5)
 ggsave(file.path(output_dir,"Sanity_Check_2","SC2.png"))
 
@@ -222,17 +222,17 @@ T <- c()
 for(i in 1:100){
   set.seed(i)
   Nprop <- runif(length(NcellType),0,1)
-    
-  Ncell <- c() 
+
+  Ncell <- c()
   expr_N <- c()
   for(CT in NcellType){
     temp <- eval(parse(text = as.character(CT)))
-    if(round(Nprop[which(NcellType == CT)]*100) == 0){next} 
+    if(round(Nprop[which(NcellType == CT)]*100) == 0){next}
     temp <- temp[,sample(colnames(temp),round(Nprop[which(NcellType == CT)]*50))]
     temp <- as.matrix(temp)
     temp <- t(temp)
     expr_N <- rbind(expr_N,temp)
-    Ncell <- c(Ncell,nrow(temp)) 
+    Ncell <- c(Ncell,nrow(temp))
   }
   total <- sum(Ncell)
   Ncell <- Ncell/total
@@ -261,6 +261,6 @@ for(i in 1:length(fractions)){
 correl_all <- data.frame(Method=rep(names(fractions),Nsampl),Correlation=correl_all[,1],Pvalue=correl_all[,2])
 write.table(correl_all,file.path(output_dir,"Sanity_Check_3","summary_correl.txt"),sep="\t",row.names=FALSE,col.names=TRUE)
 
-p <- ggplot(correl_all, aes(x=Method, y=Correlation)) + 
+p <- ggplot(correl_all, aes(x=Method, y=Correlation)) +
   geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ggsave(file.path(output_dir,"Sanity_Check_3","SC3.png"))

@@ -1,6 +1,6 @@
 from typing import List, Optional, Union
 
-from scvi.dataloaders import DataSplitter, MixUpDataSplitter
+from scvi.dataloaders import MixUpDataSplitter
 from scvi.model._utils import get_max_epochs_heuristic
 from scvi.train import TrainingPlan, TrainRunner
 from scvi.utils._docstrings import devices_dsp

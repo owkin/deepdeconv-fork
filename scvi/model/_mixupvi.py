@@ -1,13 +1,14 @@
 import logging
-from typing import List, Optional, Union, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple, Union
 
-import torch
 import numpy as np
+import torch
 from anndata import AnnData
 
-from ._scvi import SCVI
-from scvi.module import MixUpVAE
 from scvi.autotune._types import Tunable
+from scvi.module import MixUpVAE
+
+from ._scvi import SCVI
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,8 @@ class MixUpVI(SCVI):
 
     _module_cls = MixUpVAE
 
-    def train(self,
+    def train(
+        self,
         max_epochs: Tunable[Optional[int]] = None,
         use_gpu: Optional[Union[str, int, bool]] = None,
         accelerator: str = "auto",
@@ -32,20 +34,21 @@ class MixUpVI(SCVI):
         batch_size: Tunable[int] = 128,
         early_stopping: Tunable[bool] = False,
         plan_kwargs: Optional[dict] = None,
-        **trainer_kwargs,):
-            super().train(
-                  max_epochs=max_epochs,
-                  use_gpu=use_gpu,
-                  accelerator=accelerator,
-                  devices=devices,
-                  train_size=train_size,
-                  validation_size=validation_size,
-                  shuffle_set_split=shuffle_set_split,
-                  batch_size=batch_size,
-                  early_stopping=early_stopping,
-                  plan_kwargs=plan_kwargs,
-                  **trainer_kwargs,
-            )
+        **trainer_kwargs,
+    ):
+        super().train(
+            max_epochs=max_epochs,
+            use_gpu=use_gpu,
+            accelerator=accelerator,
+            devices=devices,
+            train_size=train_size,
+            validation_size=validation_size,
+            shuffle_set_split=shuffle_set_split,
+            batch_size=batch_size,
+            early_stopping=early_stopping,
+            plan_kwargs=plan_kwargs,
+            **trainer_kwargs,
+        )
 
     @torch.inference_mode()
     def get_latent_representation(
@@ -127,4 +130,3 @@ class MixUpVI(SCVI):
             if return_dist
             else torch.cat(latent).numpy()
         )
-

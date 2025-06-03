@@ -1,32 +1,33 @@
-name: Release
+# #This is used in the original scvi-tools repo however we do not use it here yet
+# name: Release
 
-on:
-    push:
-        tags:
-            - "*.*.*"
+# on:
+#     push:
+#         tags:
+#             - "*.*.*"
 
-jobs:
-    release:
-        name: Release
-        runs-on: ubuntu-latest
-        steps:
-            # will use ref/SHA that triggered it
-            - name: Checkout code
-              uses: actions/checkout@v3
+# jobs:
+#     release:
+#         name: Release
+#         runs-on: ubuntu-latest
+#         steps:
+#             # will use ref/SHA that triggered it
+#             - name: Checkout code
+#               uses: actions/checkout@v3
 
-            - name: Set up Python 3.9
-              uses: actions/setup-python@v4
-              with:
-                  python-version: "3.9"
+#             - name: Set up Python 3.9
+#               uses: actions/setup-python@v4
+#               with:
+#                   python-version: "3.9"
 
-            - name: Install hatch
-              run: |
-                  pip install hatch
+#             - name: Install hatch
+#               run: |
+#                   pip install hatch
 
-            - name: Build project for distribution
-              run: hatch build
+#             - name: Build project for distribution
+#               run: hatch build
 
-            - name: Publish a Python distribution to PyPI
-              uses: pypa/gh-action-pypi-publish@release/v1
-              with:
-                  password: ${{ secrets.PYPI_TOKEN }}
+#             - name: Publish a Python distribution to PyPI
+#               uses: pypa/gh-action-pypi-publish@release/v1
+#               with:
+#                   password: ${{ secrets.PYPI_TOKEN }}

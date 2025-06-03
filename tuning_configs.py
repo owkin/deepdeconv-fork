@@ -1,26 +1,22 @@
 """Hyperparameter search configs."""
 
-from ray import tune
-
 from constants import (
-    GROUPS,
-    TRAINING_CELL_TYPE_GROUP,
-    USE_BATCH_NORM,
-    SIGNATURE_TYPE,
-    LOSS_COMPUTATION,
-    PSEUDO_BULK,
-    ENCODE_COVARIATES,
-    MIXUP_PENALTY,
-    DISPERSION,
-    GENE_LIKELIHOOD,
-    TRAIN_SIZE,
     BATCH_SIZE,
+    DISPERSION,
+    ENCODE_COVARIATES,
+    GENE_LIKELIHOOD,
     LATENT_SIZE,
-    N_PSEUDOBULKS,
+    LOSS_COMPUTATION,
+    MIXUP_PENALTY,
     N_CELLS_PER_PSEUDOBULK,
+    N_PSEUDOBULKS,
+    PSEUDO_BULK,
     SEED,
+    SIGNATURE_TYPE,
+    TRAIN_SIZE,
+    USE_BATCH_NORM,
 )
-
+from ray import tune
 
 ### search space to define: the only thing to change
 
@@ -37,64 +33,56 @@ repeat_with_several_seeds = {
 }
 example_with_several_seeds = {
     "n_latent": tune.grid_search([30, 100]),
-    "seed": tune.grid_search([3, 8, 12])
+    "seed": tune.grid_search([3, 8, 12]),
 }
 latent_space_search_space = {
     "n_latent": tune.grid_search(
         # list(range(len(GROUPS[TRAINING_CELL_TYPE_GROUP]) - 1, 550, 20)) # from n cell types to n marker genes
-        [70, 100, 120, 150]
+        [30, 70, 100, 120, 150]
     ),
-    "seed": tune.grid_search([3, 8, 12, 23, 42])
+    "seed": tune.grid_search([3, 8, 12, 23, 42]),
 }
 batch_size_search_space = {
-    "batch_size": tune.grid_search(
-        [128, 256, 512, 1024, 2048, 5000, 10000]
-    )
+    "batch_size": tune.grid_search([128, 256, 512, 1024, 2048, 5000, 10000])
 }
 pseudo_bulk_search_space = {
-    "pseudo_bulk": tune.grid_search(
-        ["pre_encoded", "post_inference"]
-    )
+    "pseudo_bulk": tune.grid_search(["pre_encoded", "post_inference"])
 }
 signature_type_search_space = {
-    "signature_type": tune.grid_search(
-        ["pre_encoded", "post_inference"]
-    ),
-    "seed": tune.grid_search([3, 8, 12, 23, 42])
+    "signature_type": tune.grid_search(["pre_encoded", "post_inference"]),
+    "seed": tune.grid_search([3, 8, 12, 23, 42]),
 }
 loss_computation_search_space = {
-    "loss_computation": tune.grid_search(
-        ["latent_space", "reconstructed_space"]
-    )
+    "loss_computation": tune.grid_search(["latent_space", "reconstructed_space"])
 }
 gene_likelihood_search_space = {
     "gene_likelihood": tune.grid_search(["zinb", "nb", "poisson"]),
-    "seed": tune.grid_search([3, 8, 12, 23, 42])
+    "seed": tune.grid_search([3, 8, 12, 23, 42]),
 }
 n_hidden_search_space = {
     "n_hidden": tune.grid_search([128, 256, 512, 1024]),
-    "seed": tune.grid_search([3, 8, 12, 23, 42])
+    "seed": tune.grid_search([3, 8, 12, 23, 42]),
 }
 n_layers_search_space = {
     "n_layers": tune.grid_search([1, 2, 3]),
-    "seed": tune.grid_search([3, 8, 12, 23, 42])
+    "seed": tune.grid_search([3, 8, 12, 23, 42]),
 }
 n_pseudobulks_search_space = {
     "n_pseudobulks": tune.grid_search([1, 100]),
     "seed": tune.grid_search([3, 8, 12])
-   #  "seed": tune.grid_search([3, 8, 12, 23, 42])
+    #  "seed": tune.grid_search([3, 8, 12, 23, 42])
 }
 n_cells_per_pseudobulk_search_space = {
     "n_cells_per_pseudobulk": tune.grid_search([100, 256, 512, 1024, 2048]),
-    "seed": tune.grid_search([3, 8, 12])
+    "seed": tune.grid_search([3, 8, 12]),
 }
 use_batch_norm_search_space = {
     "use_batch_norm": tune.grid_search(["none", "encoder", "decoder", "both"]),
-    "seed": tune.grid_search([3, 8, 12, 23, 42])
+    "seed": tune.grid_search([3, 8, 12, 23, 42]),
 }
 SEARCH_SPACE = latent_space_search_space
 TUNED_VARIABLES = list(SEARCH_SPACE.keys())
-NUM_SAMPLES = 1 # will only perform once the gridsearch (useful to change if mix of grid and random search for instance)
+NUM_SAMPLES = 1  # will only perform once the gridsearch (useful to change if mix of grid and random search for instance)
 
 
 ### add the model and training fixed hyperparameters

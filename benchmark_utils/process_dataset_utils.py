@@ -1,10 +1,11 @@
 """Utilities for creating and preprocessing single-cell RNA datasets for deconvolution benchmarking."""
 
-import scanpy as sc
+from typing import Optional, Tuple
+
 import anndata as ad
 import pandas as pd
+import scanpy as sc
 from sklearn.model_selection import train_test_split
-from typing import Tuple, Optional
 
 from constants import GROUPS
 
@@ -23,7 +24,9 @@ def preprocess_scrna(
     sc.pp.filter_genes(adata, min_counts=3)
     adata.layers["counts"] = adata.X.copy()  # preserve counts, used for training
     sc.pp.normalize_total(adata, target_sum=1e4)
-    adata.layers["relative_counts"] = adata.X.copy()  # preserve counts, used for baselines
+    adata.layers[
+        "relative_counts"
+    ] = adata.X.copy()  # preserve counts, used for baselines
     sc.pp.log1p(adata)
     adata.raw = adata  # freeze the state in `.raw`
     if keep_genes is not None:
@@ -36,7 +39,7 @@ def preprocess_scrna(
             subset=False,
             inplace=True,
         )
-    #TODO: add the filtering / QC steps that they perform in Servier
+    # TODO: add the filtering / QC steps that they perform in Servier
 
     return adata
 
@@ -53,7 +56,8 @@ def split_dataset(
         for cell_type in v:
             group_correspondence[cell_type] = k
     adata.obs["cell_types_grouped"] = [
-        group_correspondence[cell_type] for cell_type in adata.obs.Manually_curated_celltype
+        group_correspondence[cell_type]
+        for cell_type in adata.obs.Manually_curated_celltype
     ]
     # remove some cell types: you need more than 15GB memory to run that
     index_to_keep = adata.obs.loc[adata.obs["cell_types_grouped"] != "To remove"].index
@@ -68,7 +72,7 @@ def split_dataset(
     return index_to_keep, cell_types_train, cell_types_test
 
 
-def create_new_granularity_index(grouping_choice = "2nd_level_granularity"):
+def create_new_granularity_index(grouping_choice="2nd_level_granularity"):
     """Create new granularity index file used to create signature matrices."""
     adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
     groups = GROUPS[grouping_choice]
@@ -77,7 +81,8 @@ def create_new_granularity_index(grouping_choice = "2nd_level_granularity"):
         for cell_type in v:
             group_correspondence[cell_type] = k
     adata.obs["cell_types_grouped"] = [
-        group_correspondence[cell_type] for cell_type in adata.obs.Manually_curated_celltype
+        group_correspondence[cell_type]
+        for cell_type in adata.obs.Manually_curated_celltype
     ]
     # remove some cell types: you need more than 15GB memory to run that
     index_to_keep = adata.obs.loc[adata.obs["cell_types_grouped"] != "To remove"].index
@@ -91,9 +96,15 @@ def create_new_granularity_index(grouping_choice = "2nd_level_granularity"):
         random_state=42,
     )
     index_df = pd.DataFrame(adata.obs.index, columns=["index"])
-    index_df["to keep"] = [True if index in adata2.obs.index else False for index in index_df["index"]]
-    index_df["Train index"] = [True if index in cell_types_train else False for index in index_df["index"]]
-    index_df["Test index"] = [True if index in cell_types_test else False for index in index_df["index"]]
+    index_df["to keep"] = [
+        True if index in adata2.obs.index else False for index in index_df["index"]
+    ]
+    index_df["Train index"] = [
+        True if index in cell_types_train else False for index in index_df["index"]
+    ]
+    index_df["Test index"] = [
+        True if index in cell_types_test else False for index in index_df["index"]
+    ]
     index_df["grouping"] = adata.obs["cell_types_grouped"].values
     return index_df
 
@@ -102,22 +113,45 @@ def add_cell_types_grouped(
     adata: ad.AnnData, group: str = "1st_level_granularity"
 ) -> ad.AnnData:
     """Add the cell types grouped columns in Anndata according to the grouping choice.
+
     It uses and returns the train_test_index csv file created for the signature matrix.
+
+    Parameters
+    ----------
+    adata : AnnData
+        The AnnData object to add the cell types grouped columns to
+    group : str
+        The grouping choice
     """
     if group == "1st_level_granularity":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_common.csv", index_col=1).iloc[:,1:]
+        train_test_index = pd.read_csv(
+            "/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_common.csv",
+            index_col=1,
+        ).iloc[:, 1:]
         col_name = "primary_groups"
     elif group == "2nd_level_granularity":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_granular_updated.csv", index_col=0)
+        train_test_index = pd.read_csv(
+            "/home/owkin/project/train_test_index_dataframes/train_test_index_matrix_granular_updated.csv",
+            index_col=0,
+        )
         col_name = "precise_groups_updated"
     elif group == "3rd_level_granularity":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_3rd_level.csv", index_col=1).iloc[:,1:]
+        train_test_index = pd.read_csv(
+            "/home/owkin/project/train_test_index_dataframes/train_test_index_3rd_level.csv",
+            index_col=1,
+        ).iloc[:, 1:]
         col_name = "grouping"
     elif group == "4th_level_granularity":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_4th_level.csv", index_col=1).iloc[:,1:]
+        train_test_index = pd.read_csv(
+            "/home/owkin/project/train_test_index_dataframes/train_test_index_4th_level.csv",
+            index_col=1,
+        ).iloc[:, 1:]
         col_name = "grouping"
     elif group == "FACS_1st_level_granularity":
-        train_test_index = pd.read_csv("/home/owkin/project/train_test_index_dataframes/train_test_index_facs_1st_level.csv", index_col=1).iloc[:,1:]
+        train_test_index = pd.read_csv(
+            "/home/owkin/project/train_test_index_dataframes/train_test_index_facs_1st_level.csv",
+            index_col=1,
+        ).iloc[:, 1:]
         col_name = "grouping"
     adata.obs[f"cell_types_grouped_{group}"] = train_test_index[col_name]
     return adata, train_test_index

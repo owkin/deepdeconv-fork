@@ -1,25 +1,29 @@
 """Run pseudobulk benchmark."""
 
 import argparse
-import pandas as pd
-from loguru import logger
 from typing import Optional
 
+import pandas as pd
+from loguru import logger
+
 from benchmark_utils import (
+    DECONV_METHOD_TO_EVALUATION_PSEUDOBULK,
+    GRANULARITY_TO_EVALUATION_DATASET,
+    GRANULARITY_TO_TRAINING_DATASET,
+    SINGLE_CELL_DATASETS,
     add_cell_types_grouped,
     compute_benchmark_correlations,
+    compute_benchmark_errors,
     create_signature,
     initialize_deconv_methods,
     launch_evaluation_pseudobulk_samplings,
     load_preprocessed_datasets,
     plot_benchmark_correlations,
+    plot_benchmark_errors,
     save_deconvolution_results,
-    DECONV_METHOD_TO_EVALUATION_PSEUDOBULK,
-    GRANULARITY_TO_TRAINING_DATASET,
-    GRANULARITY_TO_EVALUATION_DATASET,
-    SINGLE_CELL_DATASETS,
 )
 from run_benchmark_config_dataclass import RunBenchmarkConfig
+
 
 def run_benchmark(
     deconv_methods: list,
@@ -57,18 +61,16 @@ def run_benchmark(
 
     # Loading train/test indexes and cell type groupings
     for granularity in granularities:
-            logger.info(
-                f"Loading train/test index for granularity: {granularity}..."
-            )
-            for dataset in all_data["datasets"]:
-                    if GRANULARITY_TO_TRAINING_DATASET[granularity] == dataset:
-                        all_data["datasets"][dataset]["dataset"], train_test_index = \
-                            add_cell_types_grouped(
-                                all_data["datasets"][dataset]["dataset"], 
-                                granularity
-                            )
-                        all_data["datasets"][dataset][granularity] = train_test_index
-
+        logger.info(f"Loading train/test index for granularity: {granularity}...")
+        for dataset in all_data["datasets"]:
+            if GRANULARITY_TO_TRAINING_DATASET[granularity] == dataset:
+                (
+                    all_data["datasets"][dataset]["dataset"],
+                    train_test_index,
+                ) = add_cell_types_grouped(
+                    all_data["datasets"][dataset]["dataset"], granularity
+                )
+                all_data["datasets"][dataset][granularity] = train_test_index
 
     logger.info("All the data is now loaded.")
 
@@ -91,9 +93,13 @@ def run_benchmark(
         if evaluation_dataset in SINGLE_CELL_DATASETS:
             # Inference on scRNAseq-derived pseudobulks
             for evaluation_pseudobulk_sampling in evaluation_pseudobulk_samplings:
-                all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling] = {}
+                all_data["deconv_results"][granularity][
+                    evaluation_pseudobulk_sampling
+                ] = {}
                 for n_cells in n_cells_per_evaluation_pseudobulk:
-                    all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells] = {}
+                    all_data["deconv_results"][granularity][
+                        evaluation_pseudobulk_sampling
+                    ][n_cells] = {}
                     evaluation_pseudobulks = launch_evaluation_pseudobulk_samplings(
                         evaluation_pseudobulk_sampling=evaluation_pseudobulk_sampling,
                         all_data=all_data,
@@ -102,47 +108,134 @@ def run_benchmark(
                         n_cells_per_evaluation_pseudobulk=n_cells,
                         n_samples_evaluation_pseudobulk=n_samples_evaluation_pseudobulk,
                     )
-                    for deconv_method_initialized_key, deconv_method_initialized in deconv_methods_initialized.items():
+                    for (
+                        deconv_method_initialized_key,
+                        deconv_method_initialized,
+                    ) in deconv_methods_initialized.items():
                         if hasattr(deconv_method_initialized, "signature_matrix_name"):
-                            signature_matrix_name = deconv_method_initialized.signature_matrix_name
-                            deconv_method_key = deconv_method_initialized_key.split(f"_{signature_matrix_name}")[0]
-                            var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[deconv_method_key]
+                            signature_matrix_name = (
+                                deconv_method_initialized.signature_matrix_name
+                            )
+                            deconv_method_key = deconv_method_initialized_key.split(
+                                f"_{signature_matrix_name}"
+                            )[0]
+                            var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[
+                                deconv_method_key
+                            ]
                         else:
-                            var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[deconv_method_initialized_key]
-                        deconv_results = deconv_method_initialized.apply_deconvolution(to_deconvolve=evaluation_pseudobulks[var_to_deconvolve])
-                        all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key] = {}
-                        all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key]["deconvolution_results"] = deconv_results
-                        all_data["deconv_results"][granularity][evaluation_pseudobulk_sampling][n_cells][deconv_method_initialized_key]["ground_truth"] = evaluation_pseudobulks["df_proportions_test"]
+                            var_to_deconvolve = DECONV_METHOD_TO_EVALUATION_PSEUDOBULK[
+                                deconv_method_initialized_key
+                            ]
+                        deconv_results = deconv_method_initialized.apply_deconvolution(
+                            to_deconvolve=evaluation_pseudobulks[var_to_deconvolve]
+                        )
+                        all_data["deconv_results"][granularity][
+                            evaluation_pseudobulk_sampling
+                        ][n_cells][deconv_method_initialized_key] = {}
+                        all_data["deconv_results"][granularity][
+                            evaluation_pseudobulk_sampling
+                        ][n_cells][deconv_method_initialized_key][
+                            "deconvolution_results"
+                        ] = deconv_results
+                        all_data["deconv_results"][granularity][
+                            evaluation_pseudobulk_sampling
+                        ][n_cells][deconv_method_initialized_key][
+                            "ground_truth"
+                        ] = evaluation_pseudobulks[
+                            "df_proportions_test"
+                        ]
         else:
             # Direct inference on Bulk data
             # TODO: should we allow inference on scRNAseq-derived pseudobulks, from bulk granularities ?
-            for deconv_method_initialized_key, deconv_method_initialized in deconv_methods_initialized.items():
-                deconv_results = deconv_method_initialized.apply_deconvolution(to_deconvolve=all_data["datasets"][evaluation_dataset]["dataset"])
-                all_data["deconv_results"][granularity][deconv_method_initialized_key] = {}
-                all_data["deconv_results"][granularity][deconv_method_initialized_key]["ground_truth"] = all_data["datasets"][evaluation_dataset]["ground_truth"]
-                all_data["deconv_results"][granularity][deconv_method_initialized_key]["deconvolution_results"] = deconv_results
+            for (
+                deconv_method_initialized_key,
+                deconv_method_initialized,
+            ) in deconv_methods_initialized.items():
+                deconv_results = deconv_method_initialized.apply_deconvolution(
+                    to_deconvolve=all_data["datasets"][evaluation_dataset]["dataset"]
+                )
+                all_data["deconv_results"][granularity][
+                    deconv_method_initialized_key
+                ] = {}
+                all_data["deconv_results"][granularity][deconv_method_initialized_key][
+                    "ground_truth"
+                ] = all_data["datasets"][evaluation_dataset]["ground_truth"]
+                all_data["deconv_results"][granularity][deconv_method_initialized_key][
+                    "deconvolution_results"
+                ] = deconv_results
 
     logger.info("Deconvolution inference is now complete.")
 
     if save:
-        save_deconvolution_results(all_data["deconv_results"], experiment_path=experiment_name)
+        save_deconvolution_results(
+            all_data["deconv_results"], experiment_path=experiment_name
+        )
         logger.debug("Saved deconvolution results and ground truths.")
 
     # Compute basic correlations
     logger.info("Computing correlations.")
-    df_samples_correlation = compute_benchmark_correlations(all_data["deconv_results"], correlation_type="sample_wise_correlation")
-    df_cell_type_correlation = compute_benchmark_correlations(all_data["deconv_results"], correlation_type="cell_type_wise_correlation")
-    df_all_correlations = pd.concat([df_samples_correlation, df_cell_type_correlation], ignore_index=True)
+    df_samples_correlation = compute_benchmark_correlations(
+        all_data["deconv_results"], correlation_type="sample_wise_correlation"
+    )
+    df_cell_type_correlation = compute_benchmark_correlations(
+        all_data["deconv_results"], correlation_type="cell_type_wise_correlation"
+    )
+    df_all_correlations = pd.concat(
+        [df_samples_correlation, df_cell_type_correlation], ignore_index=True
+    )
     if save:
         df_all_correlations.to_csv(experiment_name + "/df_all_correlations.csv")
-        logger.debug(f"Saved correlation results in {experiment_name}/df_all_correlations.csv")
+        logger.debug(
+            f"Saved correlation results in {experiment_name}/df_all_correlations.csv"
+        )
     logger.info("Correlations computed.")
+
+    # Compute errors
+    logger.info("Computing errors.")
+    df_rmse_error = compute_benchmark_errors(
+        all_data["deconv_results"], error_type="root_mean_squared_error"
+    )
+    df_mae_error = compute_benchmark_errors(
+        all_data["deconv_results"], error_type="mean_absolute_error"
+    )
+    df_mape_error = compute_benchmark_errors(
+        all_data["deconv_results"], error_type="mean_absolute_percentage_error"
+    )
+    df_group_rmse_error = compute_benchmark_errors(
+        all_data["deconv_results"], error_type="cell_type_wise_root_mean_squared_error"
+    )
+    df_group_mae_error = compute_benchmark_errors(
+        all_data["deconv_results"], error_type="cell_type_wise_mean_absolute_error"
+    )
+    df_group_mape_error = compute_benchmark_errors(
+        all_data["deconv_results"],
+        error_type="cell_type_wise_mean_absolute_percentage_error",
+    )
+
+    df_all_errors = pd.concat(
+        [
+            df_rmse_error,
+            df_mae_error,
+            df_mape_error,
+            df_group_rmse_error,
+            df_group_mae_error,
+            df_group_mape_error,
+        ],
+        ignore_index=True,
+    )
+    if save:
+        df_all_errors.to_csv(experiment_name + "/df_all_errors.csv")
+        logger.debug(f"Saved error results in {experiment_name}/df_all_errors.csv")
 
     # Basic plotting
     plot_benchmark_correlations(df_all_correlations, save_path=experiment_name)
-    logger.debug(f"Saved plots.")
+    logger.debug("Saved correlation plots.")
 
-    open(f"{experiment_name}/experiment_over.txt", "w").close() # Finish experiment
+    # Error plotting
+    plot_benchmark_errors(df_all_errors, save_path=experiment_name)
+    logger.debug("Saved error plots.")
+
+    open(f"{experiment_name}/experiment_over.txt", "w").close()  # Finish experiment
     logger.info("Experiment over.")
 
 

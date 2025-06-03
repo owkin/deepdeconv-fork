@@ -1,9 +1,9 @@
 from lightning.pytorch import LightningDataModule, LightningModule, Trainer
 
 from scvi import model
+from scvi.model.base import UnsupervisedTrainingMixin
 from scvi.module.base import BaseModuleClass, JaxBaseModuleClass, PyroBaseModuleClass
 from scvi.train import TrainRunner
-from scvi.model.base import UnsupervisedTrainingMixin
 
 # colors for rich table columns
 COLORS = [
