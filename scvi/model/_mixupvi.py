@@ -1,12 +1,26 @@
 import logging
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union, Literal
 
 import numpy as np
 import torch
 from anndata import AnnData
 
+from scvi.dataloaders import MixUpDataSplitter, MixUpV2DataSplitter
+from scvi import REGISTRY_KEYS
 from scvi.autotune._types import Tunable
-from scvi.module import MixUpVAE
+from scvi.module import MixUpVAE, MixUpVAE_v2
+from scvi.utils import setup_anndata_dsp
+from scvi.data import AnnDataManager
+from scvi.data._utils import _get_adata_minify_type
+from scvi.model.utils import get_minified_adata_scrna
+from scvi.data.fields import (
+    CategoricalJointObsField,
+    CategoricalObsField,
+    LayerField,
+    NumericalJointObsField,
+    NumericalObsField,
+    ObsmField,
+)
 
 from ._scvi import SCVI
 
@@ -36,6 +50,7 @@ class MixUpVI(SCVI):
         plan_kwargs: Optional[dict] = None,
         **trainer_kwargs,
     ):
+        self._data_splitter_cls = MixUpDataSplitter
         super().train(
             max_epochs=max_epochs,
             use_gpu=use_gpu,
@@ -132,3 +147,99 @@ class MixUpVI(SCVI):
             if return_dist
             else torch.cat(latent).numpy()
         )
+
+
+
+class MixUpVI_v2(SCVI):
+    """This is just a wrapper around the MixUpVAE_v2 module. The structure is the same as the one for SCVI.
+    """
+
+    _module_cls = MixUpVAE_v2
+
+
+    def train(
+        self,
+        max_epochs: Tunable[Optional[int]] = None,
+        use_gpu: Optional[Union[str, int, bool]] = None,
+        accelerator: str = "auto",
+        devices: Union[int, List[int], str] = "auto",
+        train_size: Tunable[float] = 0.9,
+        validation_size: Optional[float] = None,
+        shuffle_set_split: bool = True,
+        batch_size: Tunable[int] = 128,
+        early_stopping: Tunable[bool] = False,
+        plan_kwargs: Optional[dict] = None,
+        **trainer_kwargs,
+    ):
+        self._data_splitter_cls = MixUpV2DataSplitter
+        super().train(
+            max_epochs=max_epochs,
+            use_gpu=use_gpu,
+            accelerator=accelerator,
+            devices=devices,
+            train_size=train_size,
+            validation_size=validation_size,
+            shuffle_set_split=shuffle_set_split,
+            batch_size=batch_size,
+            early_stopping=early_stopping,
+            plan_kwargs=plan_kwargs,
+            **trainer_kwargs,
+        )
+
+
+    @classmethod
+    @setup_anndata_dsp.dedent
+    def setup_anndata(
+        cls,
+        adata: AnnData,
+        layer: Optional[str] = None,
+        batch_key: Optional[str] = None,
+        labels_key: Optional[str] = None,
+        size_factor_key: Optional[str] = None,
+        categorical_covariate_keys: Optional[List[str]] = None,
+        continuous_covariate_keys: Optional[List[str]] = None,
+        **kwargs,
+    ):
+        """%(summary)s.
+
+        Parameters
+        ----------
+        %(param_adata)s
+        %(param_layer)s
+        %(param_batch_key)s
+        %(param_labels_key)s
+        %(param_size_factor_key)s
+        %(param_cat_cov_keys)s
+        %(param_cont_cov_keys)s
+        """
+        setup_method_args = cls._get_setup_method_args(**locals())
+        # TODO: ADD some checks to make sure that the latent_sc and ground_truth are in the adata.obsm
+        anndata_fields = [
+            LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
+            CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
+            CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
+            NumericalObsField(
+                REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False
+            ),
+            CategoricalJointObsField(
+                REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys
+            ),
+            NumericalJointObsField(
+                REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys
+            ),
+            ObsmField(
+                "latent_sc", "latent_sc",
+            ),
+            ObsmField(
+                "ground_truth", "ground_truth",
+            ),
+        ]
+        # register new fields if the adata is minified
+        adata_minify_type = _get_adata_minify_type(adata)
+        if adata_minify_type is not None:
+            anndata_fields += cls._get_fields_for_adata_minification(adata_minify_type)
+        adata_manager = AnnDataManager(
+            fields=anndata_fields, setup_method_args=setup_method_args
+        )
+        adata_manager.register_fields(adata, **kwargs)
+        cls.register_manager(adata_manager)

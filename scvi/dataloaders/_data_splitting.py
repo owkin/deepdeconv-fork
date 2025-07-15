@@ -334,6 +334,157 @@ class MixUpDataSplitter(DataSplitter):
         )
 
 
+class MixUpV2DataSplitter(pl.LightningDataModule):
+
+    data_loader_cls = AnnDataLoader
+    
+    def __init__(
+            self,
+            adata_manager: AnnDataManager,
+            train_size: float = 0.9,
+            validation_size: Optional[float] = None,
+            shuffle_set_split: bool = True,
+            pin_memory: bool = False,
+            **kwargs,
+    ):
+        super().__init__()
+        self.adata_manager = adata_manager
+        self.train_size = train_size
+        self.validation_size = validation_size
+        self.shuffle_set_split = shuffle_set_split
+        self.data_loader_kwargs = kwargs
+        self.pin_memory = pin_memory or settings.dl_pin_memory_gpu_training
+
+        try:
+            self.n_samples_pseudobulk = self.adata_manager.adata.obs["source"].value_counts()["pseudobulk"]
+            self.n_samples_bulk = self.adata_manager.adata.obs["source"].value_counts()["bulk"]
+        except KeyError as e:
+            logger.error("You should not use this datasplitter if you are not training the MixUpV2 model!")
+            raise e
+
+        self.n_train_pseudobulk, self.n_val_pseudobulk = validate_data_split(
+            n_samples=self.n_samples_pseudobulk,
+            train_size=self.train_size,
+            validation_size=self.validation_size,
+        )
+        
+        self.n_train_bulk, self.n_val_bulk = validate_data_split(
+            n_samples=self.n_samples_bulk,
+            train_size=self.train_size,
+            validation_size=self.validation_size,
+        )
+
+        self.n_train = self.n_train_pseudobulk + self.n_train_bulk
+        self.n_val = self.n_val_pseudobulk + self.n_val_bulk
+
+        if self.adata_manager.adata.n_obs != self.n_train + self.n_val:
+            logger.warning(f"Number of samples in adata: {self.adata_manager.adata.n_obs} is not equal to the sum of the number of samples in pseudobulk and bulk: {self.n_train + self.n_val}")
+
+
+    def setup(self, batch_bulk_proportion: float = 0.1, stage: Optional[str] = None):
+        n_train_pseudobulk = self.n_train_pseudobulk
+        n_val_pseudobulk = self.n_val_pseudobulk
+        n_train_bulk = self.n_train_bulk
+        n_val_bulk = self.n_val_bulk
+        
+        indices_pseudobulk = list(np.where(self.adata_manager.adata.obs["source"] == "pseudobulk")[0])
+        indices_bulk = list(np.where(self.adata_manager.adata.obs["source"] == "bulk")[0])
+
+        if self.shuffle_set_split:
+            random_state = np.random.RandomState(seed=settings.seed)
+            indices_pseudobulk = random_state.permutation(indices_pseudobulk)
+            indices_bulk = random_state.permutation(indices_bulk)
+
+        self.pseudobulks_val_idx = list(indices_pseudobulk[:n_val_pseudobulk])
+        self.pseudobulks_train_idx = list(indices_pseudobulk[n_val_pseudobulk : (n_val_pseudobulk + n_train_pseudobulk)])
+        self.pseudobulks_test_idx = list(indices_pseudobulk[(n_val_pseudobulk + n_train_pseudobulk) :])
+
+        self.bulk_val_idx = list(indices_bulk[:n_val_bulk])
+        self.bulk_train_idx = list(indices_bulk[n_val_bulk : (n_val_bulk + n_train_bulk)])
+        self.bulk_test_idx = list(indices_bulk[(n_val_bulk + n_train_bulk) :])
+
+        self.val_idx = self.pseudobulks_val_idx + self.bulk_val_idx
+        self.test_idx = self.pseudobulks_test_idx + self.bulk_test_idx
+
+        batch_size = self.data_loader_kwargs["batch_size"]
+        # Calculate number of bulks and pseudobulks per batch based on proportion
+        n_bulks_per_batch = int(batch_size * batch_bulk_proportion)
+        n_pseudobulks_per_batch = batch_size - n_bulks_per_batch
+
+        # Calculate number of complete batches and remaining samples
+        n_complete_batches = len(self.pseudobulks_train_idx) // n_pseudobulks_per_batch
+        
+        # Initialize empty train indices list
+        self.train_idx = []
+        
+        # For each complete batch
+        for i in range(n_complete_batches):
+            # Get pseudobulk indices for this batch
+            start_idx = i * n_pseudobulks_per_batch
+            end_idx = start_idx + n_pseudobulks_per_batch
+            batch_pseudobulks = self.pseudobulks_train_idx[start_idx:end_idx]
+            
+            # Sample bulk indices with replacement to match desired proportion
+            batch_bulks = np.random.choice(
+                self.bulk_train_idx,
+                size=n_bulks_per_batch,
+                replace=True
+            )
+            
+            # Combine and shuffle indices for this batch
+            batch_indices = list(batch_pseudobulks) + list(batch_bulks)
+            np.random.shuffle(batch_indices)
+            self.train_idx.extend(batch_indices)
+            
+        # Handle remaining pseudobulk samples in a partial batch if any exist
+        remaining_pseudobulks = self.pseudobulks_train_idx[n_complete_batches * n_pseudobulks_per_batch:]
+        if len(remaining_pseudobulks) > 0:
+            # Calculate proportional number of bulks for partial batch
+            n_remaining_bulks = int(np.ceil(len(remaining_pseudobulks) * batch_bulk_proportion / (1 - batch_bulk_proportion)))
+            
+            # Sample bulk indices for partial batch
+            remaining_bulks = np.random.choice(
+                self.bulk_train_idx,
+                size=n_remaining_bulks,
+                replace=True
+            )
+            
+            # Add final partial batch
+            final_batch = list(remaining_pseudobulks) + list(remaining_bulks)
+            np.random.shuffle(final_batch)
+            self.train_idx.extend(final_batch)
+
+
+    def train_dataloader(self):
+        return self.data_loader_cls(
+            self.adata_manager,
+            indices=self.train_idx,
+            shuffle=False,
+            drop_last=False,
+            pin_memory=self.pin_memory,
+            **self.data_loader_kwargs,
+        )
+    
+    def val_dataloader(self):
+        return self.data_loader_cls(
+            self.adata_manager,
+            indices=self.val_idx,
+            shuffle=False,
+            drop_last=False,
+            pin_memory=self.pin_memory,
+            **self.data_loader_kwargs,
+        )
+    
+    def test_dataloader(self):
+        return self.data_loader_cls(
+            self.adata_manager,
+            indices=self.test_idx,
+            shuffle=False,
+            drop_last=False,
+            pin_memory=self.pin_memory,
+            **self.data_loader_kwargs,
+        )
+
 class SemiSupervisedDataSplitter(pl.LightningDataModule):
     """Creates data loaders ``train_set``, ``validation_set``, ``test_set``.
 

@@ -5,6 +5,7 @@ import random
 import anndata as ad
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from loguru import logger
 
 from .run_benchmark_constants import EVALUATION_PSEUDOBULK_SAMPLINGS, initialize_func
@@ -469,3 +470,110 @@ def create_purified_50_50_pseudobulk_dataset(
         "df_proportions_test": groundtruth_fractions,
     }
     return pseudobulks
+
+
+def _sample_one_pseudobulk(i, posterior_dirichlet, index_arrays, rel_counts,
+                           counts, latent, agg="mean", rng=None):
+    """
+    Helper: build one pseudobulk and return the aggregated rows.
+    """
+    rng = np.random.default_rng(rng)          # independent stream
+
+    # --- sample cell indices -------------------------------------------------
+    idxs = np.concatenate([
+        rng.choice(arr,
+                   size=posterior_dirichlet[i, j],
+                   replace=posterior_dirichlet[i, j] > arr.size)
+        for j, arr in enumerate(index_arrays)
+    ])
+    # -------------------------------------------------------------------------
+
+    if agg == "mean":
+        rc_row = rel_counts[idxs].mean(0)
+        c_row  = counts[idxs].mean(0)
+        latent_row = latent[idxs].mean(0)
+    elif agg == "sum":
+        rc_row = rel_counts[idxs].sum(0)
+        c_row  = counts[idxs].sum(0)
+        latent_row = latent[idxs].sum(0)
+    else:
+        raise ValueError(f"Unknown aggregation {agg}")
+
+    return rc_row, c_row, latent_row, idxs
+
+
+def create_dirichlet_pseudobulk_dataset_v2(
+    adata: ad.AnnData,
+    prior_alphas= None,
+    n_sample: int = 300,
+    cell_type_group: str = "cell_types_grouped",
+    aggregation_method: str = "mean",
+    n_cells: int = 256,
+    n_jobs: int = 1                          # ← optional parallelism
+):
+    rng = np.random.default_rng()
+
+    # 1. Dirichlet fractions ➜ integer cell counts per pseudobulk ---------------
+    ct_counts = adata.obs[cell_type_group].value_counts()
+    ct_names  = ct_counts.index.to_list()
+
+    if prior_alphas is None:
+        prior_alphas = np.ones_like(ct_counts, dtype=float)
+
+    post_alpha = prior_alphas + ct_counts / adata.n_obs
+    theta      = rng.dirichlet(post_alpha, n_sample)      # (bulk, cell_type)
+
+    if isinstance(n_cells, list):
+        n_cells_vec = rng.integers(n_cells[0], n_cells[1], size=n_sample)
+        posterior_cn = np.round(theta * n_cells_vec[:, None]).astype(int)
+    else:
+        posterior_cn = np.round(theta * n_cells).astype(int)
+
+    gt_fractions = posterior_cn / posterior_cn.sum(1, keepdims=True)
+
+    # 2. Pre‑group cell indices once -------------------------------------------
+    index_arrays = [
+        np.where(adata.obs[cell_type_group].to_numpy() == ct)[0]
+        for ct in ct_names
+    ]
+
+
+    # 3. Pull raw matrices (much faster than per‑cell slicing later) ------------
+    rel_counts = adata.layers["relative_counts"]      # (scell, gene) Dense / CSR
+    counts_mat = adata.layers["counts"]
+    latent_mat = adata.obsm["latent_sc"]
+
+    # 4. Build pseudobulks (optionally parallel) --------------------------------
+    results = Parallel(n_jobs=n_jobs, prefer="threads")(
+        delayed(_sample_one_pseudobulk)(
+            i, posterior_cn, index_arrays, rel_counts, counts_mat, latent_mat,
+            aggregation_method, rng.bit_generator.random_raw())
+        for i in range(n_sample)
+    ) if n_jobs != 1 else [
+        _sample_one_pseudobulk(
+            i, posterior_cn, index_arrays, rel_counts, counts_mat, latent_mat,
+            aggregation_method, rng.bit_generator.random_raw())
+        for i in range(n_sample)
+    ]
+
+    rc_rows, c_rows, latent_rows, all_indices = map(list, zip(*results))
+
+    # 5. Assemble outputs -------------------------------------------------------
+    adata_pb_rc = ad.AnnData(
+        X=np.vstack(rc_rows),
+        var=adata.var.copy(),
+        obs=pd.DataFrame(index=[f"PB_{i}" for i in range(n_sample)])
+    )
+    adata_pb_counts = adata_pb_rc.copy()
+    adata_pb_counts.X = np.vstack(c_rows)
+    adata_pb_counts.obsm["latent_sc"] = np.vstack(latent_rows)
+
+    df_gt = pd.DataFrame(
+        gt_fractions, index=adata_pb_rc.obs_names, columns=ct_names).fillna(0)
+
+    return {
+        "adata_pseudobulk_rc":     adata_pb_rc,
+        "adata_pseudobulk_counts": adata_pb_counts,
+        "all_cell_idx_per_bulk":   all_indices,       # raw indices, very lightweight
+        "df_proportions":          df_gt
+    }

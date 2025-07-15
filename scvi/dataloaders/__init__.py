@@ -7,6 +7,7 @@ from ._data_splitting import (
     DataSplitter,
     DeviceBackedDataSplitter,
     MixUpDataSplitter,
+    MixUpV2DataSplitter,
     SemiSupervisedDataSplitter,
 )
 from ._semi_dataloader import SemiSupervisedDataLoader
@@ -18,5 +19,7 @@ __all__ = [
     "DeviceBackedDataSplitter",
     "SemiSupervisedDataLoader",
     "DataSplitter",
-    "SemiSupervisedDataSplitter",
+    "SemiSupervisedDataSplitter",   
+    "MixUpV2DataSplitter",
+    "MixUpDataSplitter",
 ]

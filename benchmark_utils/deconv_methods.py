@@ -234,6 +234,9 @@ class MixUpVIMethod(AbstractDeconvolutionMethod):
 
         return deconvolution_results
 
+class MixUpV2Method(AbstractDeconvolutionMethod):
+    pass
+
 
 class scVIMethod(AbstractDeconvolutionMethod):
     """scVI deconvolution method."""
@@ -245,10 +248,16 @@ class scVIMethod(AbstractDeconvolutionMethod):
         save_model: bool = False,
     ):
         """Fit scVI and create the latent signature matrix."""
-        self.filtered_genes = adata_train.var.index[
-            adata_train.var["highly_variable"]
-        ].tolist()
-        adata_train = adata_train[:, self.filtered_genes]
+        # self.filtered_genes = adata_train.var.index[
+        #     adata_train.var["highly_variable"]
+        # ].tolist()
+
+        import pickle
+
+        with open("project/highest_r2_genes_FACS_1st_gran.pkl", "rb") as f:
+            self.filtered_genes = pickle.load(f)
+            
+
         self.adata_obs = adata_train.obs
 
         logger.debug("Fitting scVI...")

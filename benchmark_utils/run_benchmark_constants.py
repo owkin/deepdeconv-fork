@@ -115,7 +115,7 @@ DECONV_METHODS = {
     "scVI": {
         "_target_": "benchmark_utils.scVIMethod",
         "adata_train": None,
-        "model_path": "",
+        "model_path": "project/scvi_highest_r2_genes_FACS_1st_gran/",
         "save_model": True,
     },
     "DestVI": {

@@ -791,7 +791,7 @@ class MixUpVAE(VAE):
                 message = (
                     "Sampling with the reparametrization trick is not possible with"
                     "discrete probability distribution like Poisson, NB, ZINB. "
-                    "Therefore, the MixUp penalty will the rate (i.e. mean) of  the"
+                    "Therefore, the MixUp penalty will the rate (i.e. mean) of the"
                     "distribution instead."
                 )
                 if message not in self.logger_messages:
@@ -883,4 +883,386 @@ class MixUpVAE(VAE):
 
 
 class MixUpVAE_v2(VAE):
-    pass
+    """Variational auto-encoder model with conditional mixup loss.
+
+    This version allows conditional application of mixup loss to pseudobulk data
+    using precomputed latent vectors representing the mean of single cell latent
+    representations that compose each pseudobulk.
+
+    Parameters
+    ----------
+    n_input
+        Number of input genes
+    n_batch
+        Number of batches, if 0, no batch correction is performed.
+    n_labels
+        Number of labels
+    n_hidden
+        Number of nodes per hidden layer
+    n_latent
+        Dimensionality of the latent space
+    n_layers
+        Number of hidden layers used for encoder and decoder NNs
+    n_continuous_cov
+        Number of continuous covarites
+    n_cats_per_cov
+        Number of categories for each extra categorical covariate
+    dropout_rate
+        Dropout rate for neural networks
+    dispersion
+        One of the following
+
+        * ``'gene'`` - dispersion parameter of NB is constant per gene across cells
+        * ``'gene-batch'`` - dispersion can differ between different batches
+        * ``'gene-label'`` - dispersion can differ between different labels
+        * ``'gene-cell'`` - dispersion can differ for every gene in every cell
+    log_variational
+        Log(data+1) prior to encoding for numerical stability. Not normalization.
+    gene_likelihood
+        One of
+
+        * ``'nb'`` - Negative binomial distribution
+        * ``'zinb'`` - Zero-inflated negative binomial distribution
+        * ``'poisson'`` - Poisson distribution
+    latent_distribution
+        One of
+
+        * ``'normal'`` - Isotropic normal
+        * ``'ln'`` - Logistic normal with normal params N(0, 1)
+    encode_covariates
+        Whether to concatenate covariates to expression in encoder
+    mixup_penalty
+        The loss to use to compare the encoded data and the precomputed latent vectors.
+        One of ``'l2'`` or ``'kl'``
+    apply_mixup_loss
+        Whether to apply mixup loss during training
+    deeply_inject_covariates
+        Whether to concatenate covariates into output of hidden layers in encoder/decoder. This option
+        only applies when `n_layers` > 1. The covariates are concatenated to the input of subsequent hidden layers.
+    use_batch_norm
+        Whether to use batch norm in layers.
+    use_layer_norm
+        Whether to use layer norm in layers.
+    use_size_factor_key
+        Use size_factor AnnDataField defined by the user as scaling factor in mean of conditional distribution.
+        Takes priority over `use_observed_lib_size`.
+    use_observed_lib_size
+        Use observed library size for RNA as scaling factor in mean of conditional distribution
+    library_log_means
+        1 x n_batch array of means of the log library sizes. Parameterizes prior on library size if
+        not using observed library size.
+    library_log_vars
+        1 x n_batch array of variances of the log library sizes. Parameterizes prior on library size if
+        not using observed library size.
+    var_activation
+        Callable used to ensure positivity of the variational distributions' variance.
+        When `None`, defaults to `torch.exp`.
+    extra_encoder_kwargs
+        Extra keyword arguments passed into :class:`~scvi.nn.Encoder`.
+    extra_decoder_kwargs
+        Extra keyword arguments passed into :class:`~scvi.nn.DecoderSCVI`.
+    """
+
+    def __init__(
+        self,
+        # VAE arguments
+        n_input: int,
+        n_batch: int = 0,
+        n_labels: int = 0,
+        n_hidden: Tunable[int] = 512,
+        n_latent: Tunable[int] = 10,
+        n_layers: Tunable[int] = 1,
+        seed: Tunable[int] = 0,
+        n_continuous_cov: int = 0,
+        n_cats_per_cov: Optional[Iterable[int]] = None,
+        dropout_rate: Tunable[float] = 0.1,
+        dispersion: Tunable[
+            Literal["gene", "gene-batch", "gene-label", "gene-cell"]
+        ] = "gene",
+        log_variational: bool = True,
+        gene_likelihood: Tunable[Literal["zinb", "nb", "poisson"]] = "zinb",
+        latent_distribution: Tunable[Literal["normal", "ln"]] = "normal",
+        encode_covariates: Tunable[bool] = False,
+        deeply_inject_covariates: Tunable[bool] = True,
+        use_batch_norm: Tunable[Literal["encoder", "decoder", "none", "both"]] = "none",
+        use_layer_norm: Tunable[Literal["encoder", "decoder", "none", "both"]] = "none",
+        use_size_factor_key: bool = False,
+        use_observed_lib_size: bool = True,
+        library_log_means: Optional[np.ndarray] = None,
+        library_log_vars: Optional[np.ndarray] = None,
+        var_activation: Optional[Callable] = None,
+        extra_encoder_kwargs: Optional[dict] = None,
+        extra_decoder_kwargs: Optional[dict] = None,
+        # MixUpVAE_v2 specific arguments
+        mixup_penalty: Tunable[str] = "l2",
+        latent_signature_matrix: Optional[np.ndarray] = None,
+        apply_mixup_loss: bool = True,
+    ):
+        torch.manual_seed(seed)
+
+        super().__init__(
+            n_input=n_input,
+            n_batch=n_batch,
+            n_labels=n_labels,
+            n_hidden=n_hidden,
+            n_latent=n_latent,
+            n_layers=n_layers,
+            n_continuous_cov=n_continuous_cov,
+            n_cats_per_cov=n_cats_per_cov,
+            dropout_rate=dropout_rate,
+            dispersion=dispersion,
+            log_variational=log_variational,
+            gene_likelihood=gene_likelihood,
+            latent_distribution=latent_distribution,
+            encode_covariates=encode_covariates,
+            deeply_inject_covariates=deeply_inject_covariates,
+            use_batch_norm=use_batch_norm,
+            use_layer_norm=use_layer_norm,
+            use_size_factor_key=use_size_factor_key,
+            use_observed_lib_size=use_observed_lib_size,
+            library_log_means=library_log_means,
+            library_log_vars=library_log_vars,
+            var_activation=var_activation,
+            extra_encoder_kwargs=extra_encoder_kwargs,
+            extra_decoder_kwargs=extra_decoder_kwargs,
+        )
+
+        self.mixup_penalty = mixup_penalty
+        self.apply_mixup_loss = apply_mixup_loss
+        self.latent_signature_matrix = latent_signature_matrix
+        self.logger_messages = set()
+
+    @auto_move_data
+    def inference(self, *args, **kwargs):
+        return self._regular_inference(*args, **kwargs)
+
+    def loss(
+        self,
+        tensors,
+        inference_outputs,
+        generative_outputs,
+        kl_weight: float = 1.0,
+    ):
+        """Compute the loss function with conditional mixup loss."""
+        # Standard VAE loss components
+        x = tensors[REGISTRY_KEYS.X_KEY]
+
+        tensors["is_bulk"] = tensors["extra_categorical_covs"]
+        
+        # KL divergences
+        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
+        
+        if not self.use_observed_lib_size:
+            kl_divergence_l = kl(
+                inference_outputs["ql"], generative_outputs["pl"]
+            ).sum(dim=1)
+        else:
+            kl_divergence_l = torch.tensor(0.0, device=x.device)
+
+        # Reconstruction loss
+        reconst_loss = -generative_outputs["px"].log_prob(x).sum(-1)
+
+        # Weighted KL terms
+        kl_local_for_warmup = kl_divergence_z
+        kl_local_no_warmup = kl_divergence_l
+        weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
+
+        # Base loss
+        loss = torch.mean(reconst_loss + weighted_kl_local)
+
+        # Conditional mixup loss
+        mixup_loss = torch.tensor(0.0, device=x.device)
+        if (
+            self.apply_mixup_loss 
+            and tensors["latent_sc"] is not None
+            and tensors["is_bulk"] is not None
+        ):
+            mixup_loss = self._compute_mixup_loss(tensors, inference_outputs)
+            loss = loss + mixup_loss
+            
+
+        # Prepare loss outputs
+        kl_local = {
+            "kl_divergence_l": kl_divergence_l,
+            "kl_divergence_z": kl_divergence_z,
+        }
+
+        extra_metrics = {
+            "mixup_penalty": mixup_loss,
+        }
+
+        if tensors["ground_truth"] is not None:
+            # Compute deconvolution metrics for both pseudobulks and bulks
+            z = inference_outputs["z"]
+            is_bulk = tensors["is_bulk"]
+            ground_truth = tensors["ground_truth"]
+            
+            # Get signature matrix - use latent_signature_matrix if available, otherwise use z_signature from tensors
+            if self.latent_signature_matrix is not None:
+                z_signature = torch.tensor(self.latent_signature_matrix, device=z.device, dtype=z.dtype)
+            elif "z_signature" in tensors:
+                z_signature = tensors["z_signature"]
+            else:
+                # If no signature matrix available, skip deconvolution metrics
+                z_signature = None
+            
+            if z_signature is not None:
+                # Separate pseudobulk and bulk samples
+                bulk_mask = is_bulk.bool().squeeze()
+                pseudobulk_mask = ~bulk_mask
+                
+                # Initialize metric lists
+                pseudobulk_pearson_deconv_results = []
+                pseudobulk_cosine_deconv_results = []
+                pseudobulk_mse_deconv_results = []
+                pseudobulk_mae_deconv_results = []
+                
+                bulk_pearson_deconv_results = []
+                bulk_cosine_deconv_results = []
+                bulk_mse_deconv_results = []
+                bulk_mae_deconv_results = []
+                
+                # Process pseudobulk samples
+                if pseudobulk_mask.any():
+                    z_pseudobulk = z[pseudobulk_mask]
+                    ground_truth_pseudobulk = ground_truth[pseudobulk_mask]
+                    
+                    for i, pseudobulk in enumerate(z_pseudobulk.detach().cpu().numpy()):
+                        predicted_proportions = nnls(
+                            z_signature.detach().cpu().numpy().T,
+                            pseudobulk,
+                        )[0]
+                        
+                        if np.any(predicted_proportions):
+                            # Normalize predictions to sum to 1
+                            predicted_proportions = predicted_proportions / predicted_proportions.sum()
+                        
+                        proportions_array = ground_truth_pseudobulk[i].detach().cpu().numpy()
+                        
+                        # Deconvolution metrics for pseudobulk
+                        cosine_similarity = (
+                            np.dot(proportions_array, predicted_proportions)
+                            / np.linalg.norm(proportions_array)
+                            / np.linalg.norm(predicted_proportions)
+                        )
+                        pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
+                        pseudobulk_pearson_deconv_results.append(pearson_coeff_deconv)
+                        pseudobulk_cosine_deconv_results.append(cosine_similarity)
+                        
+                        # Deconvolution errors for pseudobulk
+                        mse_deconv = np.mean((proportions_array - predicted_proportions) ** 2)
+                        mae_deconv = np.mean(np.abs(proportions_array - predicted_proportions))
+                        pseudobulk_mse_deconv_results.append(mse_deconv)
+                        pseudobulk_mae_deconv_results.append(mae_deconv)
+                
+                # Process bulk samples
+                if bulk_mask.any():
+                    z_bulk = z[bulk_mask]
+                    ground_truth_bulk = ground_truth[bulk_mask]
+                    
+                    for i, bulk in enumerate(z_bulk.detach().cpu().numpy()):
+                        predicted_proportions = nnls(
+                            z_signature.detach().cpu().numpy().T,
+                            bulk,
+                        )[0]
+                        
+                        if np.any(predicted_proportions):
+                            # Normalize predictions to sum to 1
+                            predicted_proportions = predicted_proportions / predicted_proportions.sum()
+                        
+                        proportions_array = ground_truth_bulk[i].detach().cpu().numpy()
+                        
+                        # Deconvolution metrics for bulk
+                        cosine_similarity = (
+                            np.dot(proportions_array, predicted_proportions)
+                            / np.linalg.norm(proportions_array)
+                            / np.linalg.norm(predicted_proportions)
+                        )
+                        pearson_coeff_deconv = pearsonr(proportions_array, predicted_proportions)[0]
+                        bulk_pearson_deconv_results.append(pearson_coeff_deconv)
+                        bulk_cosine_deconv_results.append(cosine_similarity)
+                        
+                        # Deconvolution errors for bulk
+                        mse_deconv = np.mean((proportions_array - predicted_proportions) ** 2)
+                        mae_deconv = np.mean(np.abs(proportions_array - predicted_proportions))
+                        bulk_mse_deconv_results.append(mse_deconv)
+                        bulk_mae_deconv_results.append(mae_deconv)
+                
+                # Calculate average metrics
+                if pseudobulk_pearson_deconv_results:
+                    pseudobulk_pearson_coeff_deconv = sum(pseudobulk_pearson_deconv_results) / len(pseudobulk_pearson_deconv_results)
+                    pseudobulk_cosine_similarity = sum(pseudobulk_cosine_deconv_results) / len(pseudobulk_cosine_deconv_results)
+                    pseudobulk_mse_deconv = sum(pseudobulk_mse_deconv_results) / len(pseudobulk_mse_deconv_results)
+                    pseudobulk_mae_deconv = sum(pseudobulk_mae_deconv_results) / len(pseudobulk_mae_deconv_results)
+                else:
+                    pseudobulk_pearson_coeff_deconv = 0.0
+                    pseudobulk_cosine_similarity = 0.0
+                    pseudobulk_mse_deconv = 0.0
+                    pseudobulk_mae_deconv = 0.0
+                
+                if bulk_pearson_deconv_results:
+                    bulk_pearson_coeff_deconv = sum(bulk_pearson_deconv_results) / len(bulk_pearson_deconv_results)
+                    bulk_cosine_similarity = sum(bulk_cosine_deconv_results) / len(bulk_cosine_deconv_results)
+                    bulk_mse_deconv = sum(bulk_mse_deconv_results) / len(bulk_mse_deconv_results)
+                    bulk_mae_deconv = sum(bulk_mae_deconv_results) / len(bulk_mae_deconv_results)
+                else:
+                    bulk_pearson_coeff_deconv = 0.0
+                    bulk_cosine_similarity = 0.0
+                    bulk_mse_deconv = 0.0
+                    bulk_mae_deconv = 0.0
+                
+                # Add metrics to extra_metrics
+                extra_metrics.update({
+                    "pseudobulk_pearson_coeff_deconv": pseudobulk_pearson_coeff_deconv,
+                    "pseudobulk_cosine_similarity": pseudobulk_cosine_similarity,
+                    "pseudobulk_mse_deconv": pseudobulk_mse_deconv,
+                    "pseudobulk_mae_deconv": pseudobulk_mae_deconv,
+                    "bulk_pearson_coeff_deconv": bulk_pearson_coeff_deconv,
+                    "bulk_cosine_similarity": bulk_cosine_similarity,
+                    "bulk_mse_deconv": bulk_mse_deconv,
+                    "bulk_mae_deconv": bulk_mae_deconv,
+                })
+
+        return LossOutput(
+            loss=loss,
+            reconstruction_loss=reconst_loss,
+            kl_local=kl_local,
+            extra_metrics=extra_metrics,
+        )
+
+    def _compute_mixup_loss(self, tensors, inference_outputs):
+        """Compute mixup loss for pseudobulk samples."""
+        z = inference_outputs["z"]
+        precomputed_latent = tensors["latent_sc"]
+        is_bulk = tensors["is_bulk"]
+
+        # Filter for pseudobulk samples only
+        pseudobulk_mask = ~is_bulk.bool().squeeze()
+        if not pseudobulk_mask.any():
+            return torch.tensor(0.0, device=z.device)
+
+        z_pseudobulk = z[pseudobulk_mask]
+        precomputed_latent_pseudobulk = precomputed_latent[pseudobulk_mask]
+
+        if self.mixup_penalty == "l2":
+            # L2 loss between encoded pseudobulk and precomputed latent
+            mixup_loss = torch.sum(
+                (z_pseudobulk - precomputed_latent_pseudobulk) ** 2, axis=1
+            )
+        elif self.mixup_penalty == "kl":
+            # KL divergence between distributions
+            qz = inference_outputs["qz"]
+            qz_pseudobulk = qz.loc[pseudobulk_mask], qz.scale[pseudobulk_mask]
+            
+            # Create normal distribution from precomputed latent (assuming unit variance)
+            precomputed_dist = Normal(
+                precomputed_latent_pseudobulk,
+                torch.ones_like(precomputed_latent_pseudobulk)
+            )
+            current_dist = Normal(qz_pseudobulk[0], qz_pseudobulk[1])
+            
+            mixup_loss = kl(current_dist, precomputed_dist).sum(dim=-1)
+        else:
+            raise ValueError(f"Unknown mixup_penalty: {self.mixup_penalty}")
+
+        return torch.mean(mixup_loss)
