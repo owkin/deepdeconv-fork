@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import abstractmethod
 
 import anndata as ad
+import numpy as np
 import pandas as pd
 from loguru import logger
 from sklearn.decomposition import PCA
@@ -17,6 +18,7 @@ from .pseudobulk_dataset_utils import create_anndata_pseudobulk
 from .training_utils import (
     fit_destvi,
     fit_mixupvi,
+    fit_mixupvi_v2,
     fit_scvi,
 )
 
@@ -171,6 +173,11 @@ class MixUpVIMethod(AbstractDeconvolutionMethod):
         #     adata_train.var["highly_variable"]
         # ].tolist()
 
+        import pickle
+
+        with open("project/highest_r2_genes_FACS_1st_gran.pkl", "rb") as f:
+            self.filtered_genes = pickle.load(f)
+
         adata_train = adata_train[:, self.filtered_genes]
         self.adata_obs = adata_train.obs
 
@@ -234,8 +241,103 @@ class MixUpVIMethod(AbstractDeconvolutionMethod):
 
         return deconvolution_results
 
-class MixUpV2Method(AbstractDeconvolutionMethod):
-    pass
+class MixUpVI_v2Method(AbstractDeconvolutionMethod):
+    """MixUpVI_v2 deconvolution method."""
+
+    def __init__(
+        self,
+        adata_train: ad.AnnData,
+        cell_type_group: str,
+        base_model_path: str,
+        model_path: str = "",
+        save_model: bool = False,
+    ):
+        """Fit MixUpVI_v2 and create the latent signature matrix."""
+
+        import pickle
+
+        with open("project/highest_r2_genes_FACS_1st_gran.pkl", "rb") as f:
+            self.filtered_genes = pickle.load(f)
+
+        adata_train = adata_train[:, self.filtered_genes]
+        self.adata_obs = adata_train.obs
+
+        logger.debug("Fitting MixUpVI_v2...")
+        self.mixupvi_v2 = fit_mixupvi_v2(
+            adata=adata_train.copy(),
+            base_model_path=base_model_path,
+            model_path=model_path,
+            cell_type_group=cell_type_group,
+            save_model=save_model,
+        )
+
+
+        adata_train.obs["source"] = "pseudobulk"
+        adata_train.obs["has_latent"] = True
+        adata_train.obsm["latent_sc"] = np.full((adata_train.shape[0], self.mixupvi_v2.module.n_latent), np.nan)
+        adata_train.obsm["ground_truth"] = np.full((adata_train.shape[0], self.mixupvi_v2.module.latent_signature_matrix.shape[0]), np.nan)
+
+        logger.debug("Training over. Creation of latent signature matrix...")
+        # self.adata_latent_signature = create_latent_signature(
+        #     adata=adata_train,
+        #     model=self.mixupvi_v2,
+        #     use_mixupvi=False,
+        #     average_all_cells=True,
+        # )
+        # self.adata_latent_signature = pd.DataFrame(
+        #     self.adata_latent_signature.X.T,
+        #     index=self.adata_latent_signature.var_names,
+        #     columns=self.adata_latent_signature.obs["cell type"],
+        # )
+
+        self.adata_latent_signature = self.mixupvi_v2.module.latent_signature_matrix
+        self.adata_latent_signature = pd.DataFrame(
+            self.adata_latent_signature.T,
+            columns=self.mixupvi_v2.adata.uns["bulk_cell_types_order"],
+        )
+
+    def apply_deconvolution(self, to_deconvolve: ad.AnnData | pd.DataFrame):
+        """Apply the MixUpVI_v2 method on data to deconvolve."""    
+        if isinstance(to_deconvolve, ad.AnnData):
+            # Pseudobulks constructed from scRNAseq
+            obs_names = to_deconvolve.obs_names
+            to_deconvolve = to_deconvolve[:, self.filtered_genes]
+            to_deconvolve.obs["source"] = "pseudobulk"
+            to_deconvolve.obs["has_latent"] = True
+        elif isinstance(to_deconvolve, pd.DataFrame):
+            # Bulk/FACS data
+            obs_names = to_deconvolve.columns
+            adata_obs = pd.DataFrame({"source": ["bulk"] * to_deconvolve.shape[1], "has_latent": [False] * to_deconvolve.shape[1]})
+
+            to_deconvolve = create_anndata_pseudobulk(
+                adata_obs=adata_obs,
+                adata_var_names=self.filtered_genes,
+                x=to_deconvolve.loc[self.filtered_genes].T.values,
+            )
+        else:
+            message = (
+                "Data to deconvolve during inference can either be AnnData or DataFrame, "
+                f"but here it is of type {type(to_deconvolve)}."
+            )
+            logger.error(message)
+            raise ValueError(message)
+        
+        #TODO: Here we need to prepare the data for the MixUpVI_v2 model
+        to_deconvolve.obsm["latent_sc"] = np.full((to_deconvolve.shape[0], self.mixupvi_v2.module.n_latent), np.nan)
+        to_deconvolve.obsm["ground_truth"] = np.full((to_deconvolve.shape[0], self.mixupvi_v2.module.latent_signature_matrix.shape[0]), np.nan)
+
+        
+        latent_adata = self.mixupvi_v2.get_latent_representation(to_deconvolve)
+        latent_adata = pd.DataFrame(
+            index=obs_names,
+            columns=self.adata_latent_signature.index,
+            data=latent_adata,
+        ).T
+        deconvolution_results = use_nnls_method(
+            latent_adata, self.adata_latent_signature
+        )
+
+        return deconvolution_results
 
 
 class scVIMethod(AbstractDeconvolutionMethod):

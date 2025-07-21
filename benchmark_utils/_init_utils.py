@@ -29,10 +29,8 @@ def transfer_weights_selective(base_model: SCVI, mixupvi_model: MixUpVI_v2) -> N
             if mixupvae_state_dict[name].shape == param.shape:
                 new_state_dict[name] = param.clone()
             else:
-                #TODO: Error handling
-                #print(f"Shape mismatch for {name}, the {i}th parameter: VAE {param.shape} vs MixUpVAE_v2 {mixupvae_state_dict[name].shape}")
-                logger.error(f"Shape mismatch for {name}, the {i}th parameter: Base Module {param.shape} vs MixUpVAE_v2 {mixupvae_state_dict[name].shape}")
-                raise ValueError(f"Shape mismatch for {name}, the {i}th parameter: Base Module {param.shape} vs MixUpVAE_v2 {mixupvae_state_dict[name].shape}")
+                logger.warning(f"Shape mismatch for {name}, the {i}th parameter: Base Module {param.shape} vs MixUpVAE_v2 {mixupvae_state_dict[name].shape}")
+                #raise ValueError(f"Shape mismatch for {name}, the {i}th parameter: Base Module {param.shape} vs MixUpVAE_v2 {mixupvae_state_dict[name].shape}")
         else:
             logger.error(f"Parameter {name} not found in MixUpVAE_v2")
             raise ValueError(f"Parameter {name} not found in MixUpVAE_v2")

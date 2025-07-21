@@ -7,6 +7,7 @@ from .correlation_utils import (
 from .deconv_methods import (
     DestVIMethod,
     MixUpVIMethod,
+    MixUpVI_v2Method,
     NNLSMethod,
     PCA_NNLSMethod,
     PCAMethod,

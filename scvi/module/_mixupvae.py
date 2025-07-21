@@ -1047,8 +1047,14 @@ class MixUpVAE_v2(VAE):
         # Standard VAE loss components
         x = tensors[REGISTRY_KEYS.X_KEY]
 
-        tensors["is_bulk"] = tensors["extra_categorical_covs"]
-        
+        # TODO: change this sloppy check to something more robust
+        if "extra_categorical_covs" in tensors.keys():
+            tensors["is_bulk"] = tensors["extra_categorical_covs"]
+        elif "batch" in tensors.keys():
+            tensors["is_bulk"] = tensors["batch"]
+        else:
+            raise ValueError("No bulk/pseudobulk information found in tensors.")
+
         # KL divergences
         kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
         
@@ -1087,8 +1093,14 @@ class MixUpVAE_v2(VAE):
             "kl_divergence_z": kl_divergence_z,
         }
 
+        extra_alignment_loss = self._compute_extra_alignment_loss(tensors, inference_outputs)
+        extra_alignment_loss = torch.mean(extra_alignment_loss)
+
+        loss = loss + extra_alignment_loss
+
         extra_metrics = {
             "mixup_penalty": mixup_loss,
+            "extra_alignment_loss": extra_alignment_loss,
         }
 
         if tensors["ground_truth"] is not None:
@@ -1266,3 +1278,31 @@ class MixUpVAE_v2(VAE):
             raise ValueError(f"Unknown mixup_penalty: {self.mixup_penalty}")
 
         return torch.mean(mixup_loss)
+    
+    def _compute_extra_alignment_loss(self, tensors, inference_outputs):
+        """Compute KL divergence between bulk and pseudobulk latent spaces."""
+        qz = inference_outputs["qz"]
+        is_bulk = tensors["is_bulk"]
+
+        # Filter for pseudobulk samples only
+        pseudobulk_mask = ~is_bulk.bool().squeeze()
+        if not pseudobulk_mask.any():
+            return torch.tensor(0.0, device=qz.device)
+
+        #Here, instead of taking all the pseubulk samples, just sample the same number as bulk samples and compute the KL divergence on those.
+        n_bulk = (~pseudobulk_mask).sum()
+        
+        # Randomly sample n_bulk indices from pseudobulk samples
+        pseudobulk_indices = torch.where(pseudobulk_mask)[0]
+        sampled_indices = pseudobulk_indices[torch.randperm(len(pseudobulk_indices))[:n_bulk]]
+        pseudobulk_mask_sampled = torch.zeros_like(pseudobulk_mask, dtype=torch.bool)
+        pseudobulk_mask_sampled[sampled_indices] = True
+
+        qz_pseudobulk_mean, qz_pseudobulk_scale = qz.loc[pseudobulk_mask_sampled], qz.scale[pseudobulk_mask_sampled]
+        qz_bulk_mean, qz_bulk_scale = qz.loc[~pseudobulk_mask], qz.scale[~pseudobulk_mask]
+
+        # Create normal distribution from precomputed latent (assuming unit variance)
+        qz_pseudobulk_dist = Normal(qz_pseudobulk_mean, qz_pseudobulk_scale)
+        qz_bulk_dist = Normal(qz_bulk_mean, qz_bulk_scale)
+
+        return kl(qz_pseudobulk_dist, qz_bulk_dist).sum(dim=-1)

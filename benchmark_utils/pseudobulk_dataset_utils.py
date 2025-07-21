@@ -10,6 +10,9 @@ from loguru import logger
 
 from .run_benchmark_constants import EVALUATION_PSEUDOBULK_SAMPLINGS, initialize_func
 
+from constants import N_CELLS_PER_PSEUDOBULK
+from .load_dataset_utils import load_bulk_facs
+
 
 def launch_evaluation_pseudobulk_samplings(
     evaluation_pseudobulk_sampling: list,
@@ -509,9 +512,10 @@ def create_dirichlet_pseudobulk_dataset_v2(
     cell_type_group: str = "cell_types_grouped",
     aggregation_method: str = "mean",
     n_cells: int = 256,
-    n_jobs: int = 1                          # ← optional parallelism
+    n_jobs: int = 1,                         # ← optional parallelism
+    seed: int = None
 ):
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed)
 
     # 1. Dirichlet fractions ➜ integer cell counts per pseudobulk ---------------
     ct_counts = adata.obs[cell_type_group].value_counts()
@@ -577,3 +581,93 @@ def create_dirichlet_pseudobulk_dataset_v2(
         "all_cell_idx_per_bulk":   all_indices,       # raw indices, very lightweight
         "df_proportions":          df_gt
     }
+
+
+def prepare_mixupvi_v2_data(
+    adata: ad.AnnData,
+    base_model,
+    n_pseudobulk_samples: int = 10000,
+    n_cells_per_pseudobulk: int = None,
+    seed: int = None,
+):
+    """Prepare data for MixUpVI_v2 model training.
+    
+    This function extracts the data preprocessing logic from fit_mixupvi_v2
+    to create the final adata object that combines pseudobulk and bulk data.
+    
+    Parameters
+    ----------
+    adata : AnnData
+        The single-cell AnnData object
+    base_model
+        The trained base model (MixUpVI or SCVI)
+    n_pseudobulk_samples : int
+        Number of pseudobulk samples to create
+    n_cells_per_pseudobulk : int
+        Number of cells per pseudobulk. If None, uses N_CELLS_PER_PSEUDOBULK from constants
+        
+    Returns
+    -------
+    final_adata : AnnData
+        The final processed AnnData object ready for MixUpVI_v2 training
+    """
+    
+    if n_cells_per_pseudobulk is None:
+        n_cells_per_pseudobulk = N_CELLS_PER_PSEUDOBULK
+    
+    # Add latent representation to single-cell data
+    adata.obsm["latent_sc"] = base_model.get_latent_representation(give_mean=True, return_dist=False)
+    
+    # Create pseudobulk dataset
+    adata_pb = create_dirichlet_pseudobulk_dataset_v2(
+        adata, 
+        n_sample=n_pseudobulk_samples, 
+        n_cells=n_cells_per_pseudobulk,
+        seed=seed
+    )
+    genes = adata_pb["adata_pseudobulk_counts"].var_names.tolist()
+    
+    # Load and process bulk data
+    bulk_dataset = load_bulk_facs()
+    adata_bulk = bulk_dataset["dataset"]
+    adata_bulk = adata_bulk.loc[genes]
+    adata_bulk = adata_bulk.T
+    
+    adata_bulk = ad.AnnData(
+        X=adata_bulk.values,
+        var=adata_pb["adata_pseudobulk_counts"].var,
+    )
+    
+    # Process ground truth proportions
+    bulk_dataset["ground_truth"] = bulk_dataset["ground_truth"] / 100
+    bulk_dataset["ground_truth"] = bulk_dataset["ground_truth"].div(
+        bulk_dataset["ground_truth"].sum(axis=1), axis=0
+    )
+    bulk_dataset["ground_truth"] = bulk_dataset["ground_truth"][adata_pb["df_proportions"].columns]
+    
+    # Add latent representation placeholder for bulk data
+    adata_bulk.obsm["latent_sc"] = np.full(
+        (adata_bulk.n_obs, adata_pb["adata_pseudobulk_counts"].obsm["latent_sc"].shape[1]),
+        np.nan,
+        dtype=np.float32
+    )
+    adata_bulk.obsm["ground_truth"] = bulk_dataset["ground_truth"].values
+    adata_bulk.uns["cell_types_order"] = bulk_dataset["ground_truth"].columns.tolist()
+    
+    # Add metadata flags
+    adata_bulk.obs["has_latent"] = False
+    adata_pb["adata_pseudobulk_counts"].obs["has_latent"] = True
+    adata_pb["adata_pseudobulk_counts"].obsm["ground_truth"] = adata_pb["df_proportions"].values
+    adata_pb["adata_pseudobulk_counts"].uns["cell_types_order"] = adata_pb["df_proportions"].columns
+    
+    # Concatenate pseudobulk and bulk data
+    final_adata = ad.concat(
+        [adata_pb["adata_pseudobulk_counts"], adata_bulk],
+        join="outer",
+        merge="same",
+        label="source",
+        keys=["pseudobulk", "bulk"],
+    )
+
+    final_adata.uns["bulk_cell_types_order"] = adata_bulk.uns["cell_types_order"]
+    return final_adata

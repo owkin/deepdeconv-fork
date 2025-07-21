@@ -36,7 +36,7 @@ from tuning_configs import TUNED_VARIABLES
 
 from .training_callbacks import LatentSpaceVisualizationCallback
 from .tuning_utils import format_and_save_tuning_results
-from .pseudobulk_dataset_utils import create_dirichlet_pseudobulk_dataset_v2
+from .pseudobulk_dataset_utils import create_dirichlet_pseudobulk_dataset_v2, prepare_mixupvi_v2_data
 from .load_dataset_utils import load_bulk_facs
 from .latent_signature_utils import create_latent_signature
 from ._init_utils import transfer_weights_selective
@@ -192,7 +192,7 @@ def fit_mixupvi_v2(
     Parameters
     ----------
     adata : AnnData
-        The AnnData object to fit the MixUpVI_v2 model on
+        The AnnData object to fit the MixUpVI_v2 model on, this has to be single-cell 
     base_model_path : str
         The path to save the base model
     model_path : str
@@ -203,65 +203,27 @@ def fit_mixupvi_v2(
         Whether to save the MixUpVI_v2 model
     """
 
+    if os.path.exists(base_model_path):
+        logger.info(f"Base model fitted, saved in path:{base_model_path}, loading MixUpVI...")
+        base_model = scvi.model.MixUpVI.load(base_model_path, adata.copy())
+    else:
+        logger.info(f"Base model not fitted, fitting MixUpVI...")
+        #Here we can interchangebly use the scvi model or the mixupvi model as base model
+        base_model = fit_mixupvi(adata.copy(), base_model_path, cell_type_group=cell_type_group, save_model=save_model)
+
+    # Prepare data for MixUpVI_v2 using the dedicated function
+    final_adata = prepare_mixupvi_v2_data(
+        adata=adata,
+        base_model=base_model,
+        n_pseudobulk_samples=10000,
+        n_cells_per_pseudobulk=N_CELLS_PER_PSEUDOBULK,
+        seed=SEED,
+    )
+
     if os.path.exists(model_path):
         logger.info(f"Model fitted, saved in path:{model_path}, loading MixUpVI_v2...")
-        logger.error("This is not implemented yet, we need to process the data before the loading of the MixUpVI_v2 model")
-        raise NotImplementedError("This is not implemented yet, we need to process the data before the loading of the MixUpVI_v2 model")
-        # mixupvi_v2_model = scvi.model.MixUpVI_v2.load(model_path, adata)
+        mixupvi_v2_model = scvi.model.MixUpVI_v2.load(model_path, final_adata)
     else:
-
-        #!!!!!!!! In this case we might need to insert a fictional categorical covariate that will be used to initialize the parameters that are then used in the MixUpVI_v2 model, this is not necessary if initialize the second network from scratch
-        logger.warning("Fictional categorical covariate inserted to initialize the parameters that are then used in the MixUpVI_v2 model, please remove it if you want to initialize the second network from scratch")
-        adata.obs["source"] = "cti"
-        adata.obs.iloc[-1, adata.obs.columns.get_loc("source")] = "pseudobulk"
-
-        if os.path.exists(base_model_path):
-            logger.info(f"Base model fitted, saved in path:{base_model_path}, loading MixUpVI...")
-            base_model = scvi.model.MixUpVI.load(base_model_path, adata.copy())
-        else:
-            logger.info(f"Base model not fitted, fitting MixUpVI...")
-            #Here we can interchangebly use the scvi model or the mixupvi model as base model
-            base_model = fit_mixupvi(adata, base_model_path, cell_type_group=cell_type_group, save_model=save_model)
-        
-        adata.obsm["latent_sc"] = base_model.get_latent_representation(give_mean=True, return_dist=False)
-
-        adata_pb = create_dirichlet_pseudobulk_dataset_v2(adata, n_sample=10000, n_cells=N_CELLS_PER_PSEUDOBULK)
-        genes = adata_pb["adata_pseudobulk_counts"].var_names.tolist()
-
-        bulk_dataset = load_bulk_facs()
-        adata_bulk = bulk_dataset["dataset"]
-        adata_bulk = adata_bulk.loc[genes]
-        adata_bulk = adata_bulk.T
-        
-        adata_bulk = ad.AnnData(
-            X=adata_bulk.values,
-            var=adata_pb["adata_pseudobulk_counts"].var,
-        )
-
-        bulk_dataset["ground_truth"] = bulk_dataset["ground_truth"]/100
-        bulk_dataset["ground_truth"] = bulk_dataset["ground_truth"].div(bulk_dataset["ground_truth"].sum(axis=1), axis=0)
-        bulk_dataset["ground_truth"]= bulk_dataset["ground_truth"][adata_pb["df_proportions"].columns]
-        
-        adata_bulk.obsm["latent_sc"] = np.full(
-            (adata_bulk.n_obs, adata_pb["adata_pseudobulk_counts"].obsm["latent_sc"].shape[1]),
-            np.nan,
-            dtype=np.float32
-        )
-        adata_bulk.obsm["ground_truth"] = bulk_dataset["ground_truth"].values
-        adata_bulk.uns["cell_types_order"] = bulk_dataset["ground_truth"].columns.tolist()
-
-        adata_bulk.obs["has_latent"] = False
-        adata_pb["adata_pseudobulk_counts"].obs["has_latent"] = True
-        adata_pb["adata_pseudobulk_counts"].obsm["ground_truth"] = adata_pb["df_proportions"].values
-        adata_pb["adata_pseudobulk_counts"].uns["cell_types_order"] = adata_pb["df_proportions"].columns
-
-        final_adata = ad.concat(
-            [adata_pb["adata_pseudobulk_counts"], adata_bulk],
-            join="outer",
-            merge="same",
-            label="source",
-            keys=["pseudobulk", "bulk"],
-        )
 
         latent_signature_matrix = create_latent_signature(
             adata,
@@ -270,14 +232,13 @@ def fit_mixupvi_v2(
             average_all_cells=True,
         )
 
-        ordered_indices = [np.where(latent_signature_matrix.obs["cell type"] == cell_type)[0][0] for cell_type in adata_bulk.uns["cell_types_order"]]
+        ordered_indices = [np.where(latent_signature_matrix.obs["cell type"] == cell_type)[0][0] for cell_type in final_adata.uns["bulk_cell_types_order"]]
         ordered_latent_signature = latent_signature_matrix.X[ordered_indices]
 
+        # We need to add the batch effect here if we are using it in the MixUpVI_v2 model
         scvi.model.MixUpVI_v2.setup_anndata(
             final_adata,
-            batch_key=None,
-            categorical_covariate_keys=CAT_COV,
-            continuous_covariate_keys=CONT_COV,
+            batch_key="source",
         )
 
         # Filter out any extra params that MixUpVI_v2 doesn't need
@@ -290,6 +251,9 @@ def fit_mixupvi_v2(
             if k in scvi.model.MixUpVI_v2.__init__.__code__.co_varnames
         }
         
+        # We need to add the batch effect also here if we are using it in the MixUpVI_v2 model
+        mixupvi_params["dispersion"] = "gene-batch"
+
         mixupvi_v2_model = scvi.model.MixUpVI_v2(
             final_adata,
             **mixupvi_params,
@@ -309,7 +273,7 @@ def fit_mixupvi_v2(
         
         if save_model:
             mixupvi_v2_model.save(model_path)
-    
+
     return mixupvi_v2_model
 
 
