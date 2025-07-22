@@ -252,8 +252,8 @@ def fit_mixupvi_v2(
         }
         
         # We need to add the batch effect also here when using it in the MixUpVI_v2 model
-        mixupvi_params["dispersion"] = "gene-batch"
-        mixupvi_params["gene_likelihood"] = "nb"
+        # mixupvi_params["dispersion"] = "gene-batch"
+        # mixupvi_params["gene_likelihood"] = "nb"
 
         mixupvi_v2_model = scvi.model.MixUpVI_v2(
             final_adata,
