@@ -2,16 +2,16 @@
 
 ## Constants for run_mixupvi.py
 TUNE_MIXUPVI = False
-TRAINING_DATASET = "DLBCL_sc"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
-TRAINING_CELL_TYPE_GROUP = "DLBCL_2nd_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
+TRAINING_DATASET = "CTI"  # ["CTI", "TOY", "CTI_PROCESSED", "CTI_RAW"]
+TRAINING_CELL_TYPE_GROUP = "FACS_1st_level_granularity"  # ["1st_level_granularity", "2nd_level_granularity", "3rd_level_granularity", "4th_level_granularity", "FACS_1st_level_granularity"]
 N_GENES = 2000  # number of input genes after preprocessing (NOT USED INSIDE BENCHMARK)
 
 ## Constants for both run_mixupvi.py and run_benchmark.py
 # For all VI models
-LATENT_SIZE = 30
+LATENT_SIZE = 10
 MAX_EPOCHS = 100
 SAVE_MODEL = True
-SEED = 3
+SEED = 42
 # MixUpVI training hyperparameters
 BATCH_SIZE = 1024
 TRAIN_SIZE = 0.7  # as opposed to validation
@@ -25,14 +25,14 @@ N_CELLS_PER_PSEUDOBULK = (
 )
 N_HIDDEN = 512
 CONT_COV = None  # None or list of continuous covariates to include
-CAT_COV = None  # None or ["donor_id", "assay"]
+CAT_COV = None # None or ["donor_id", "assay"] or ["source"] if we are using the MixUpVI_v2 model
 ENCODE_COVARIATES = False  # whether to encode cont/cat covars (they are always decoded)
 LOSS_COMPUTATION = "latent_space"  # ["latent_space", "reconstructed_space"]
 PSEUDO_BULK = "pre_encoded"  # ["pre_encoded", "post_inference"]
 PSEUDO_BULK_AGGREGATION = "mean"  # ["mean", "sum"]
 SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 MIXUP_PENALTY = "l2"  # ["l2", "kl"]
-DISPERSION = "gene"  # ["gene", "gene_label"]
+DISPERSION = "gene"  # ["gene", "gene_label"] # Back to "gene" if we are not using the batch effect above 
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
 USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
 
