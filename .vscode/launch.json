@@ -20,6 +20,14 @@
             "args": ["--config", "benchmark_configs/config_test.yaml"],
             "justMyCode": false,
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python Debugger: trial.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/trial.py",
+            "justMyCode": false,
+            "console": "integratedTerminal"
         }
     ]
 }

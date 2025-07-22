@@ -238,7 +238,7 @@ def fit_mixupvi_v2(
         # We need to add the batch effect here if we are using it in the MixUpVI_v2 model
         scvi.model.MixUpVI_v2.setup_anndata(
             final_adata,
-            batch_key="source",
+            #batch_key="source",
         )
 
         # Filter out any extra params that MixUpVI_v2 doesn't need
@@ -252,7 +252,7 @@ def fit_mixupvi_v2(
         }
         
         # We need to add the batch effect also here if we are using it in the MixUpVI_v2 model
-        mixupvi_params["dispersion"] = "gene-batch"
+        #mixupvi_params["dispersion"] = "gene-batch"
 
         mixupvi_v2_model = scvi.model.MixUpVI_v2(
             final_adata,
@@ -262,7 +262,7 @@ def fit_mixupvi_v2(
         )
         mixupvi_v2_model.view_anndata_setup()
 
-        transfer_weights_selective(base_model, mixupvi_v2_model)
+        #transfer_weights_selective(base_model, mixupvi_v2_model)
 
         mixupvi_v2_model.train(
             max_epochs=MAX_EPOCHS,

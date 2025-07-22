@@ -91,7 +91,7 @@ DECONV_METHODS = {
     "MixUpVI": {
         "_target_": "benchmark_utils.MixUpVIMethod",
         "adata_train": None,
-        "model_path": "project/mixupvi_base_debug",
+        "model_path": "project/base_mixupvi_FACS_1st_gran_batch",
         "cell_type_group": "cell_types_grouped",
         "save_model": True,
         "latent_space_visualizer": False,
@@ -99,8 +99,8 @@ DECONV_METHODS = {
     "MixUpVI_v2": {
         "_target_": "benchmark_utils.MixUpVI_v2Method",
         "adata_train": None,
-        "model_path": "project/mixupvi_v2_debug",
-        "base_model_path": "project/mixupvi_base_debug",
+        "model_path": "project/mixupvi_v2_FACS_1st_gran_no_batch_extra_alignment",
+        "base_model_path": "project/base_mixupvi_FACS_1st_gran_batch",
         "cell_type_group": "cell_types_grouped",
         "save_model": True,
     },
