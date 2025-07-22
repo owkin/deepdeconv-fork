@@ -99,7 +99,7 @@ DECONV_METHODS = {
     "MixUpVI_v2": {
         "_target_": "benchmark_utils.MixUpVI_v2Method",
         "adata_train": None,
-        "model_path": "project/mixupvi_v2_FACS_gene_dispersion_extra_alignment",
+        "model_path": "project/mixupvi_v2_FACS_extra_alignment_nb_dist_corrected",
         "base_model_path": "project/base_mixupvi_FACS_1st_gran_batch",
         "cell_type_group": "cell_types_grouped",
         "save_model": True,

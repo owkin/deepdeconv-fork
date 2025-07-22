@@ -11,7 +11,7 @@ N_GENES = 2000  # number of input genes after preprocessing (NOT USED INSIDE BEN
 LATENT_SIZE = 10
 MAX_EPOCHS = 100
 SAVE_MODEL = True
-SEED = 42
+SEED = 12
 # MixUpVI training hyperparameters
 BATCH_SIZE = 1024
 TRAIN_SIZE = 0.7  # as opposed to validation
