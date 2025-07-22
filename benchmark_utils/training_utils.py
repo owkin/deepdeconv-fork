@@ -235,10 +235,10 @@ def fit_mixupvi_v2(
         ordered_indices = [np.where(latent_signature_matrix.obs["cell type"] == cell_type)[0][0] for cell_type in final_adata.uns["bulk_cell_types_order"]]
         ordered_latent_signature = latent_signature_matrix.X[ordered_indices]
 
-        # We need to add the batch effect here if we are using it in the MixUpVI_v2 model
+        # We need to add the batch effect here when using it in the MixUpVI_v2 model
         scvi.model.MixUpVI_v2.setup_anndata(
             final_adata,
-            #batch_key="source",
+            batch_key="source",
         )
 
         # Filter out any extra params that MixUpVI_v2 doesn't need
@@ -251,8 +251,8 @@ def fit_mixupvi_v2(
             if k in scvi.model.MixUpVI_v2.__init__.__code__.co_varnames
         }
         
-        # We need to add the batch effect also here if we are using it in the MixUpVI_v2 model
-        #mixupvi_params["dispersion"] = "gene-batch"
+        # We need to add the batch effect also here when using it in the MixUpVI_v2 model
+        # mixupvi_params["dispersion"] = "gene-batch"
 
         mixupvi_v2_model = scvi.model.MixUpVI_v2(
             final_adata,
