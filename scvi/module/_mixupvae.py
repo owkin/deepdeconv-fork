@@ -1093,8 +1093,7 @@ class MixUpVAE_v2(VAE):
             "kl_divergence_z": kl_divergence_z,
         }
 
-        extra_alignment_loss = self._compute_extra_alignment_loss(tensors, inference_outputs)
-        extra_alignment_loss = torch.mean(extra_alignment_loss)
+        extra_alignment_loss = self._compute_extra_modified_alignment_loss(tensors, inference_outputs)
 
         loss = loss + extra_alignment_loss
 
@@ -1287,7 +1286,7 @@ class MixUpVAE_v2(VAE):
         # Filter for pseudobulk samples only
         pseudobulk_mask = ~is_bulk.bool().squeeze()
         if not pseudobulk_mask.any():
-            return torch.tensor(0.0, device=qz.device)
+            return torch.tensor(0.0, device=qz.loc.device)
 
         #Here, instead of taking all the pseubulk samples, just sample the same number as bulk samples and compute the KL divergence on those.
         n_bulk = (~pseudobulk_mask).sum()
@@ -1305,4 +1304,34 @@ class MixUpVAE_v2(VAE):
         qz_pseudobulk_dist = Normal(qz_pseudobulk_mean, qz_pseudobulk_scale)
         qz_bulk_dist = Normal(qz_bulk_mean, qz_bulk_scale)
 
-        return kl(qz_pseudobulk_dist, qz_bulk_dist).sum(dim=-1)
+        return kl(qz_pseudobulk_dist, qz_bulk_dist).sum(dim=-1).mean()
+    
+    def _compute_extra_modified_alignment_loss(self, tensors, inference_outputs):
+        """Compute KL divergence between bulk and pseudobulk latent spaces using center of pseudobulks."""
+        qz = inference_outputs["qz"]
+        is_bulk = tensors["is_bulk"]
+
+        # Filter for bulk and pseudobulk samples
+        bulk_mask = is_bulk.bool().squeeze()
+        pseudobulk_mask = ~bulk_mask
+        if not pseudobulk_mask.any() or not bulk_mask.any():
+            return torch.tensor(0.0, device=qz.loc.device)
+
+        # Get mean of pseudobulk latent space
+        qz_pseudobulk_mean = qz.loc[pseudobulk_mask].mean(dim=0, keepdim=True)
+        qz_pseudobulk_scale = qz.scale[pseudobulk_mask].mean(dim=0, keepdim=True)
+
+        # Repeat the mean for each bulk sample
+        n_bulk = bulk_mask.sum()
+        qz_pseudobulk_mean = qz_pseudobulk_mean.repeat(n_bulk, 1)
+        qz_pseudobulk_scale = qz_pseudobulk_scale.repeat(n_bulk, 1)
+
+        # Get bulk latent space
+        qz_bulk_mean = qz.loc[bulk_mask]
+        qz_bulk_scale = qz.scale[bulk_mask]
+
+        # Create normal distributions
+        qz_pseudobulk_dist = Normal(qz_pseudobulk_mean, qz_pseudobulk_scale)
+        qz_bulk_dist = Normal(qz_bulk_mean, qz_bulk_scale)
+
+        return kl(qz_pseudobulk_dist, qz_bulk_dist).sum(dim=-1).mean()

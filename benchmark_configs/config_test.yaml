@@ -9,5 +9,5 @@ n_cells_per_evaluation_pseudobulk: [256]
 signature_matrices: ["FACS_1st_level_granularity"]
 train_dataset: "CTI"
 n_variable_genes: 2000
-experiment_name: "mixupvi_v2_FACS_gene_dispersion_extra_alignment" # if None, a random name will be chosen
+experiment_name: "mixupvi_v2_FACS_extra_alignment_bulk_to_pseudo_centroids" # if None, a random name will be chosen
 save: True # if False, only the plots will be saved
