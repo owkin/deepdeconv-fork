@@ -1093,7 +1093,7 @@ class MixUpVAE_v2(VAE):
             "kl_divergence_z": kl_divergence_z,
         }
 
-        extra_alignment_loss = self._compute_extra_modified_alignment_loss(tensors, inference_outputs)
+        extra_alignment_loss = self._compute_extra_alignment_loss_bulk_centroid_to_pseudo_centroid(tensors, inference_outputs, type="kl")
 
         loss = loss + extra_alignment_loss
 
@@ -1306,7 +1306,7 @@ class MixUpVAE_v2(VAE):
 
         return kl(qz_pseudobulk_dist, qz_bulk_dist).sum(dim=-1).mean()
     
-    def _compute_extra_modified_alignment_loss(self, tensors, inference_outputs):
+    def _compute_extra_alignment_loss_bulk_to_pseudo_centroid(self, tensors, inference_outputs):
         """Compute KL divergence between bulk and pseudobulk latent spaces using center of pseudobulks."""
         qz = inference_outputs["qz"]
         is_bulk = tensors["is_bulk"]
@@ -1335,3 +1335,32 @@ class MixUpVAE_v2(VAE):
         qz_bulk_dist = Normal(qz_bulk_mean, qz_bulk_scale)
 
         return kl(qz_pseudobulk_dist, qz_bulk_dist).sum(dim=-1).mean()
+    
+    def _compute_extra_alignment_loss_bulk_centroid_to_pseudo_centroid(self, tensors, inference_outputs, type: str = "kl"):
+        """Compute KL divergence between bulk centroid and pseudobulk centroid."""
+        qz = inference_outputs["qz"]
+        is_bulk = tensors["is_bulk"]
+
+        # Filter for bulk and pseudobulk samples
+        bulk_mask = is_bulk.bool().squeeze()
+        pseudobulk_mask = ~bulk_mask
+        if not pseudobulk_mask.any() or not bulk_mask.any():
+            return torch.tensor(0.0, device=qz.loc.device)
+        
+        # Get mean of bulk latent space
+        qz_bulk_mean = qz.loc[bulk_mask].mean(dim=0, keepdim=True)
+        qz_bulk_scale = qz.scale[bulk_mask].mean(dim=0, keepdim=True)
+
+        # Get mean of pseudobulk latent space
+        qz_pseudobulk_mean = qz.loc[pseudobulk_mask].mean(dim=0, keepdim=True)
+        qz_pseudobulk_scale = qz.scale[pseudobulk_mask].mean(dim=0, keepdim=True)
+        
+        # Create normal distributions
+        if type == "kl":
+            qz_bulk_dist = Normal(qz_bulk_mean, qz_bulk_scale)
+            qz_pseudobulk_dist = Normal(qz_pseudobulk_mean, qz_pseudobulk_scale)
+            return kl(qz_bulk_dist, qz_pseudobulk_dist).sum(dim=-1).mean()
+        elif type == "l1":
+            return torch.sum(torch.abs(qz_bulk_mean - qz_pseudobulk_mean), dim=-1).mean()
+        else:
+            raise ValueError(f"Unknown type: {type}")
