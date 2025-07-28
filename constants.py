@@ -34,7 +34,7 @@ SIGNATURE_TYPE = "post_inference"  # ["pre_encoded", "post_inference"]
 MIXUP_PENALTY = "l2"  # ["l2", "kl"]
 DISPERSION = "gene"  # ["gene", "gene_label"] # Back to "gene" if we are not using the batch effect above 
 GENE_LIKELIHOOD = "zinb"  # ["zinb", "nb", "poisson"]
-USE_BATCH_NORM = "none"  # ["encoder", "decoder", "none", "both"]
+USE_BATCH_NORM = "both"  # ["encoder", "decoder", "none", "both"]
 
 # Other : different possibilities of cell groupings with the CTI dataset
 GROUPS = {
