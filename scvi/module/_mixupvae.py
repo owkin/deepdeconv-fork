@@ -1095,7 +1095,7 @@ class MixUpVAE_v2(VAE):
 
         extra_alignment_loss = self._compute_extra_alignment_loss_bulk_centroid_to_pseudo_centroid(tensors, inference_outputs, type="wasserstein")
 
-        loss = loss + kl_weight * extra_alignment_loss
+        loss = loss + 4000 * (0.25 - kl_weight) * extra_alignment_loss
 
         extra_metrics = {
             "mixup_penalty": mixup_loss,
