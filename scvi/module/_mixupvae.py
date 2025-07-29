@@ -1093,7 +1093,7 @@ class MixUpVAE_v2(VAE):
             "kl_divergence_z": kl_divergence_z,
         }
 
-        extra_alignment_loss = self._compute_extra_alignment_loss(tensors, inference_outputs)
+        extra_alignment_loss = self._compute_extra_alignment_loss_bulk_centroid_to_pseudo_centroid(tensors, inference_outputs, type="wasserstein")
 
         loss = loss + extra_alignment_loss
 
@@ -1362,5 +1362,9 @@ class MixUpVAE_v2(VAE):
             return kl(qz_bulk_dist, qz_pseudobulk_dist).sum(dim=-1).mean()
         elif type == "l1":
             return torch.sum(torch.abs(qz_bulk_mean - qz_pseudobulk_mean), dim=-1).mean()
+        elif type == "wasserstein":
+            mean_diff_sq = torch.pow(qz_bulk_mean - qz_pseudobulk_mean, 2).sum()
+            scale_diff_sq = torch.pow(qz_bulk_scale - qz_pseudobulk_scale, 2).sum()
+            return mean_diff_sq + scale_diff_sq
         else:
             raise ValueError(f"Unknown type: {type}")

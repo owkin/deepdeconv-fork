@@ -11,7 +11,7 @@ with open("project/highest_r2_genes_FACS_1st_gran.pkl", "rb") as f:
     filtered_genes = pkl.load(f)
 
 BASE_MODEL_PATH = "project/base_mixupvi_FACS_1st_gran"
-MIXUPVI_V2_MODEL_PATH = "project/mixupvi_v2_FACS_extra_alignment_bulk_centroid_to_pseudo_centroid_l1_weighted"
+MIXUPVI_V2_MODEL_PATH = "project/mixupvi_v2_FACS_extra_alignment_wasserstein"
 
 # %%
 cti_adata = sc.read("/home/owkin/project/cti/cti_adata.h5ad")
