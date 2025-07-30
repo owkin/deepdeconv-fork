@@ -99,7 +99,7 @@ DECONV_METHODS = {
     "MixUpVI_v2": {
         "_target_": "benchmark_utils.MixUpVI_v2Method",
         "adata_train": None,
-        "model_path": "project/mixupvi_v2_FACS_extra_alignment_wasserstein_scheduled_v1",
+        "model_path": "project/mixupvi_v2_FACS_extra_alignment_final",
         "base_model_path": "project/base_mixupvi_FACS_1st_gran_batch",
         "cell_type_group": "cell_types_grouped",
         "save_model": True,
@@ -218,7 +218,7 @@ GRANULARITY_TO_EVALUATION_DATASET = {
     "2nd_level_granularity": "CTI",
     "3rd_level_granularity": "CTI",
     "4th_level_granularity": "CTI",
-    "FACS_1st_level_granularity": "BULK_FACS",
+    "FACS_1st_level_granularity": "CTI", # This change was made to evaluate the model on the pseudobulks instead of the bulks, change back to BULK_FACS!!!!
     "DLBCL_2nd_level_granularity": "DLBCL_sc",  # This is just a test to use the pseudobulks instead of the bulks as evaluation
     # add the one for TOY
 }

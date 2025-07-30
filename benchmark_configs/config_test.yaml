@@ -1,7 +1,7 @@
 ## A test config to run the benchmark
 
 deconv_methods: ["NNLS", "MixUpVI", "MixUpVI_v2"] # "TAPE", "Scaden", "scVI", "DestVI"
-evaluation_datasets: ["BULK_FACS"]
+evaluation_datasets: ["CTI"]
 granularities: ["FACS_1st_level_granularity"]
 evaluation_pseudobulk_samplings: ["DIRICHLET"] # "UNIFORM", "PURIFIED"
 n_samples_evaluation_pseudobulk: 500
@@ -9,5 +9,5 @@ n_cells_per_evaluation_pseudobulk: [256]
 signature_matrices: ["FACS_1st_level_granularity"]
 train_dataset: "CTI"
 n_variable_genes: 2000
-experiment_name: "mixupvi_v2_FACS_extra_alignment_wasserstein_scheduled_v1" # if None, a random name will be chosen
+experiment_name: "mixupvi_v2_FACS_extra_alignment_final" # if None, a random name will be chosen
 save: True # if False, only the plots will be saved
