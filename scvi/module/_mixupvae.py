@@ -1083,7 +1083,7 @@ class MixUpVAE_v2(VAE):
             and tensors["latent_sc"] is not None
             and tensors["is_bulk"] is not None
         ):
-            mixup_loss = self._compute_mixup_loss(tensors, inference_outputs)
+            mixup_loss = self._compute_mixup_loss_prior_deconvolution(tensors, inference_outputs)
             loss = loss + mixup_loss
             
 
@@ -1271,6 +1271,33 @@ class MixUpVAE_v2(VAE):
                 torch.ones_like(precomputed_latent_pseudobulk)
             )
             current_dist = Normal(qz_pseudobulk[0], qz_pseudobulk[1])
+            
+            mixup_loss = kl(current_dist, precomputed_dist).sum(dim=-1)
+        else:
+            raise ValueError(f"Unknown mixup_penalty: {self.mixup_penalty}")
+
+        return torch.mean(mixup_loss)
+    
+    def _compute_mixup_loss_prior_deconvolution(self, tensors, inference_outputs):
+        """Compute mixup loss for all samples."""
+        z = inference_outputs["z"]
+        precomputed_latent = tensors["latent_sc"]
+
+        if self.mixup_penalty == "l2":
+            # L2 loss between encoded samples and precomputed latent
+            mixup_loss = torch.sum(
+                (z - precomputed_latent) ** 2, axis=1
+            )
+        elif self.mixup_penalty == "kl":
+            # KL divergence between distributions
+            qz = inference_outputs["qz"]
+            
+            # Create normal distribution from precomputed latent (assuming unit variance)
+            precomputed_dist = Normal(
+                precomputed_latent,
+                torch.ones_like(precomputed_latent)
+            )
+            current_dist = Normal(qz.loc, qz.scale)
             
             mixup_loss = kl(current_dist, precomputed_dist).sum(dim=-1)
         else:

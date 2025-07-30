@@ -36,7 +36,8 @@ from tuning_configs import TUNED_VARIABLES
 
 from .training_callbacks import LatentSpaceVisualizationCallback
 from .tuning_utils import format_and_save_tuning_results
-from .pseudobulk_dataset_utils import create_dirichlet_pseudobulk_dataset_v2, prepare_mixupvi_v2_data
+from .pseudobulk_dataset_utils import prepare_mixupvi_v2_data
+from .appendix_utils import prepare_mixupvi_v2_data_prior_deconvolution
 from .load_dataset_utils import load_bulk_facs
 from .latent_signature_utils import create_latent_signature
 from ._init_utils import transfer_weights_selective
@@ -212,10 +213,10 @@ def fit_mixupvi_v2(
         base_model = fit_mixupvi(adata.copy(), base_model_path, cell_type_group=cell_type_group, save_model=save_model)
 
     # Prepare data for MixUpVI_v2 using the dedicated function
-    final_adata = prepare_mixupvi_v2_data(
+    final_adata = prepare_mixupvi_v2_data_prior_deconvolution(
         adata=adata,
         base_model=base_model,
-        n_pseudobulk_samples=30000,
+        n_pseudobulk_samples=10000,
         n_cells_per_pseudobulk=N_CELLS_PER_PSEUDOBULK,
         seed=SEED,
     )
