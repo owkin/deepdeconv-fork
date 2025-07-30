@@ -215,7 +215,7 @@ def fit_mixupvi_v2(
     final_adata = prepare_mixupvi_v2_data(
         adata=adata,
         base_model=base_model,
-        n_pseudobulk_samples=10000,
+        n_pseudobulk_samples=30000,
         n_cells_per_pseudobulk=N_CELLS_PER_PSEUDOBULK,
         seed=SEED,
     )
