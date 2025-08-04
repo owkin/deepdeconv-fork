@@ -1093,13 +1093,13 @@ class MixUpVAE_v2(VAE):
             "kl_divergence_z": kl_divergence_z,
         }
 
-        extra_alignment_loss = self._compute_extra_alignment_loss(tensors, inference_outputs)
+        #extra_alignment_loss = self._compute_extra_alignment_loss(tensors, inference_outputs)
 
-        loss = loss + extra_alignment_loss # 4000 * (0.25 - kl_weight) * extra_alignment_loss is the scheduled version
+        # loss = loss + extra_alignment_loss # 4000 * (0.25 - kl_weight) * extra_alignment_loss is the scheduled version
 
         extra_metrics = {
             "mixup_penalty": mixup_loss,
-            "extra_alignment_loss": extra_alignment_loss,
+            #"extra_alignment_loss": extra_alignment_loss,
         }
 
         if tensors["ground_truth"] is not None:

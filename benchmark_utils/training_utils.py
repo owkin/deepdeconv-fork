@@ -213,7 +213,7 @@ def fit_mixupvi_v2(
         base_model = fit_mixupvi(adata.copy(), base_model_path, cell_type_group=cell_type_group, save_model=save_model)
 
     # Prepare data for MixUpVI_v2 using the dedicated function
-    final_adata = prepare_mixupvi_v2_data(
+    final_adata = prepare_mixupvi_v2_data_prior_deconvolution(
         adata=adata,
         base_model=base_model,
         n_pseudobulk_samples=10000,

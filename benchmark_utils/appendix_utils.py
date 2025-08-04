@@ -49,10 +49,11 @@ def prepare_mixupvi_v2_data_prior_deconvolution(
     )
     bulk_dataset["ground_truth"] = bulk_dataset["ground_truth"][adata_pb["df_proportions"].columns]
     
-    signature_matrix = create_signature(signature_type="FACS_1st_level_granularity")
-    bulk_to_deconvolve = adata_bulk.to_df().T
     # Add latent representation for bulk data coming from a prior deconvolution
-    prior_deconvolution = use_nnls_method(bulk_to_deconvolve, signature_matrix)
+    # signature_matrix = create_signature(signature_type="FACS_1st_level_granularity")
+    # bulk_to_deconvolve = adata_bulk.to_df().T
+    # prior_deconvolution = use_nnls_method(bulk_to_deconvolve, signature_matrix)
+    prior_deconvolution = bulk_dataset["ground_truth"]
     latent_signature_matrix = create_latent_signature(
         adata,
         model=base_model,
