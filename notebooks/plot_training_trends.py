@@ -3,7 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 
 
-model_path = "/home/owkin/deepdeconv-fork/project/mixupvi_v2_FACS_extra_alignment_final_larger_pseudo_dataset/model.pt"
+model_path = "/home/owkin/deepdeconv-fork/project/mixupvi_v2_FACS_kl_bulk_centroid_to_pseudo_centroid_scheduled/model.pt"
 
 #%%
 

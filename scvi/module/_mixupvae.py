@@ -1093,7 +1093,7 @@ class MixUpVAE_v2(VAE):
             "kl_divergence_z": kl_divergence_z,
         }
 
-        extra_alignment_loss = self._compute_extra_alignment_loss_bulk_centroid_to_pseudo_centroid(tensors, inference_outputs, type="kl")
+        extra_alignment_loss = self._compute_extra_alignment_loss_bulk_centroid_to_pseudo_centroid(tensors, inference_outputs, type="l1")
 
         loss = loss + 4000 * (0.25 - kl_weight) * extra_alignment_loss # is the scheduled version
 
