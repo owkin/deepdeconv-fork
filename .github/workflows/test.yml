@@ -38,9 +38,9 @@ jobs:
             PYTHON: ${{ matrix.python }}
 
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
             - name: Set up Python ${{ matrix.python }}
-              uses: actions/setup-python@v4
+              uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
               with:
                   python-version: ${{ matrix.python }}
                   cache: "pip"
@@ -59,4 +59,4 @@ jobs:
               run: |
                   pytest -v --cov --color=yes
             - name: Upload coverage
-              uses: codecov/codecov-action@v3
+              uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3 at 2026-07-07
